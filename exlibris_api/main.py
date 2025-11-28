@@ -39,6 +39,7 @@ app = FastAPI(
     title="ExLibris",
     description="Api Exlibris.",
     version="1.0.0",
+    root_path="/exlibris-api",
 )
 
 app.add_middleware(
