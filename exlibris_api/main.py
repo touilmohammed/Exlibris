@@ -21,18 +21,6 @@ def get_db_connection():
     return conn
 
 
-def row_to_exchange(row) -> ExchangeOut:
-    return ExchangeOut(
-        id_echange=row[0],
-        demandeur_id=row[1],
-        destinataire_id=row[2],
-        livre_demandeur_isbn=row[3],
-        livre_destinataire_isbn=row[4],
-        statut=row[5],
-        date_creation=row[6],
-        date_derniere_maj=row[7],
-    )
-
 # --------------------------------------------------------------------
 # App FastAPI + CORS
 # --------------------------------------------------------------------
@@ -104,6 +92,19 @@ class ExchangeOut(BaseModel):
     statut: str
     date_creation: Optional[str] = None
     date_derniere_maj: Optional[str] = None
+
+
+def row_to_exchange(row) -> ExchangeOut:
+    return ExchangeOut(
+        id_echange=row[0],
+        demandeur_id=row[1],
+        destinataire_id=row[2],
+        livre_demandeur_isbn=row[3],
+        livre_destinataire_isbn=row[4],
+        statut=row[5],
+        date_creation=row[6],
+        date_derniere_maj=row[7],
+    )
 
 
 # --------------------------------------------------------------------
