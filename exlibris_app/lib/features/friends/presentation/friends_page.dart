@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/friend.dart';
 import '../../friends/data/friends_repository.dart';
 import 'suggest_book_sheet.dart';
+import '../../exchanges/data/exchanges_repository.dart';
 
 class FriendsPage extends ConsumerStatefulWidget {
   const FriendsPage({super.key});
@@ -213,22 +214,88 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
     );
   }
 
-  void _openExchangeDialog(Friend friend) {
-    showDialog(
+  Future<void> _openExchangeDialog(Friend friend) async {
+    final myIsbnController = TextEditingController();
+    final theirIsbnController = TextEditingController();
+
+    await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Proposer un échange à ${friend.nom}'),
-        content: const Text(
-          'Ici on pourra choisir un livre à échanger.\n'
-          '(Pour le moment, c’est juste un mock.)',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Fermer'),
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text('Proposer un échange à ${friend.nom}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: myIsbnController,
+                decoration: const InputDecoration(
+                  labelText: 'Ton livre (ISBN)',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: theirIsbnController,
+                decoration: const InputDecoration(
+                  labelText: 'Livre de ${''} (ISBN)',
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final myIsbn = myIsbnController.text.trim();
+                final theirIsbn = theirIsbnController.text.trim();
+
+                if (myIsbn.isEmpty || theirIsbn.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Merci de remplir les deux ISBN.'),
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  final repo = ref.read(
+                    exchangesRepositoryProvider,
+                  ); // 👈 nouveau
+                  await repo.createExchange(
+                    destinataireId: friend.id,
+                    livreDemandeurIsbn: myIsbn,
+                    livreDestinataireIsbn: theirIsbn,
+                  );
+
+                  if (!mounted) return;
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Échange proposé à ${friend.nom} (ton $myIsbn ↔ son $theirIsbn)',
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Erreur lors de la proposition d’échange : $e',
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Proposer l’échange'),
+            ),
+          ],
+        );
+      },
     );
   }
 
