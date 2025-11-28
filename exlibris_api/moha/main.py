@@ -2,44 +2,29 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
-import pymysql
+from pathlib import Path
+import sqlite3
 
 # --------------------------------------------------------------------
-# Config BDD MariaDB
+# Config BDD SQLite
 # --------------------------------------------------------------------
-DB_HOST = "87.106.141.247"
-DB_PORT = 3306
-DB_USER = "exlibris"
-DB_PASSWORD = "exlibris2b"
-DB_NAME = "exlibris"
+DB_PATH = Path("exlibris.db")
 
 # Pour l’instant : on suppose que l'utilisateur connecté a l'id 1
 CURRENT_USER_ID = 1
 
-
 def get_db_connection():
-    try:
-        conn = pymysql.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            cursorclass=pymysql.cursors.Cursor,
-        )
-        return conn
-    except Exception as e:
-        raise RuntimeError(f"Erreur de connexion MariaDB: {e}")
+    if not DB_PATH.exists():
+        raise RuntimeError(f"Base SQLite non trouvée à {DB_PATH.resolve()}")
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 # --------------------------------------------------------------------
 # App FastAPI + CORS
 # --------------------------------------------------------------------
-app = FastAPI(
-    title="ExLibris",
-    description="Api Exlibris.",
-    version="1.0.0",
-)
+app = FastAPI(title="ExLibris API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -134,7 +119,7 @@ TOKENS: set[str] = set()  # pseudo tokens d'accès (debug)
 # --------------------------------------------------------------------
 @app.get("/")
 def health():
-    return {"ok": True, "service": "ExLibris API", "db": DB_NAME}
+    return {"ok": True, "service": "ExLibris API", "db": str(DB_PATH.resolve())}
 
 
 # --------------------------------------------------------------------
@@ -217,31 +202,31 @@ def search_livres(
     params: list = []
 
     if isbn:
-        clauses.append("isbn = %s")
+        clauses.append("isbn = ?")
         params.append(isbn)
 
     if query:
         like = f"%{query}%"
-        clauses.append("(titre LIKE %s OR auteur LIKE %s)")
+        clauses.append("(titre LIKE ? OR auteur LIKE ?)")
         params.extend([like, like])
 
     if auteur:
         like_a = f"%{auteur}%"
-        clauses.append("auteur LIKE %s")
+        clauses.append("auteur LIKE ?")
         params.append(like_a)
 
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
 
-    sql += " LIMIT %s"
+    sql += " LIMIT ?"
     params.append(limit)
 
     try:
         cur.execute(sql, params)
         rows = cur.fetchall()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
 
@@ -256,10 +241,10 @@ def search_livres(
         for row in rows
     ]
 
-
 # --------------------------------------------------------------------
 # Collection utilisateur (stockée en base, table Collection)
 # --------------------------------------------------------------------
+
 @app.get("/me/collection", response_model=List[Book])
 def get_collection():
     """
@@ -273,16 +258,16 @@ def get_collection():
         SELECT l.isbn, l.titre, l.auteur, l.categorie, l.image_petite
         FROM Collection c
         JOIN Livre l ON l.isbn = c.livre_isbn
-        WHERE c.utilisateur_id = %s
+        WHERE c.utilisateur_id = ?
         ORDER BY c.date_ajout DESC
     """
 
     try:
         cur.execute(sql, (CURRENT_USER_ID,))
         rows = cur.fetchall()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
 
@@ -310,7 +295,7 @@ def add_collection(item: AddItem):
 
     try:
         # 1) vérifier que le livre existe
-        cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (item.isbn,))
+        cur.execute("SELECT 1 FROM Livre WHERE isbn = ?", (item.isbn,))
         if cur.fetchone() is None:
             conn.close()
             raise HTTPException(status_code=404, detail="Livre introuvable")
@@ -320,7 +305,7 @@ def add_collection(item: AddItem):
             """
             SELECT 1
             FROM Collection
-            WHERE utilisateur_id = %s AND livre_isbn = %s
+            WHERE utilisateur_id = ? AND livre_isbn = ?
             """,
             (CURRENT_USER_ID, item.isbn),
         )
@@ -333,14 +318,14 @@ def add_collection(item: AddItem):
         cur.execute(
             """
             INSERT INTO Collection (utilisateur_id, livre_isbn)
-            VALUES (%s, %s)
+            VALUES (?, ?)
             """,
             (CURRENT_USER_ID, item.isbn),
         )
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return {"ok": True}
@@ -360,15 +345,15 @@ def remove_collection(
         cur.execute(
             """
             DELETE FROM Collection
-            WHERE utilisateur_id = %s AND livre_isbn = %s
+            WHERE utilisateur_id = ? AND livre_isbn = ?
             """,
             (CURRENT_USER_ID, isbn),
         )
         conn.commit()
         deleted = cur.rowcount
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
 
@@ -383,6 +368,8 @@ def remove_collection(
 # --------------------------------------------------------------------
 # WISHLIST utilisateur (table Souhait)
 # --------------------------------------------------------------------
+
+
 @app.get("/me/wishlist", response_model=List[Book])
 def get_wishlist():
     """
@@ -398,15 +385,15 @@ def get_wishlist():
             SELECT l.isbn, l.titre, l.auteur, l.categorie, l.image_petite
             FROM Souhait s
             JOIN Livre l ON l.isbn = s.livre_isbn
-            WHERE s.utilisateur_id = %s
+            WHERE s.utilisateur_id = ?
             ORDER BY s.date_ajout DESC
             """,
             (CURRENT_USER_ID,),
         )
         rows = cur.fetchall()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
 
@@ -433,7 +420,7 @@ def add_wishlist(item: AddItem):
 
     try:
         # 1) vérifier que le livre existe
-        cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (item.isbn,))
+        cur.execute("SELECT 1 FROM Livre WHERE isbn = ?", (item.isbn,))
         row = cur.fetchone()
         if not row:
             conn.close()
@@ -443,7 +430,7 @@ def add_wishlist(item: AddItem):
         cur.execute(
             """
             SELECT 1 FROM Souhait
-            WHERE utilisateur_id = %s AND livre_isbn = %s
+            WHERE utilisateur_id = ? AND livre_isbn = ?
             """,
             (CURRENT_USER_ID, item.isbn),
         )
@@ -456,15 +443,15 @@ def add_wishlist(item: AddItem):
         cur.execute(
             """
             INSERT INTO Souhait (utilisateur_id, livre_isbn)
-            VALUES (%s, %s)
+            VALUES (?, ?)
             """,
             (CURRENT_USER_ID, item.isbn),
         )
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return {"ok": True}
@@ -485,7 +472,7 @@ def remove_wishlist(
         cur.execute(
             """
             DELETE FROM Souhait
-            WHERE utilisateur_id = %s AND livre_isbn = %s
+            WHERE utilisateur_id = ? AND livre_isbn = ?
             """,
             (CURRENT_USER_ID, isbn),
         )
@@ -495,10 +482,10 @@ def remove_wishlist(
                 status_code=404, detail="Livre non présent dans la wishlist"
             )
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return {"ok": True}
@@ -694,7 +681,7 @@ def create_exchange(body: ExchangeCreate):
     try:
         # Vérifier que le destinataire existe
         cur.execute(
-            "SELECT 1 FROM Utilisateur WHERE id_utilisateur = %s",
+            "SELECT 1 FROM Utilisateur WHERE id_utilisateur = ?",
             (body.destinataire_id,),
         )
         if not cur.fetchone():
@@ -702,7 +689,7 @@ def create_exchange(body: ExchangeCreate):
             raise HTTPException(status_code=404, detail="Destinataire introuvable")
 
         # Vérifier que les deux livres existent
-        cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (body.livre_demandeur_isbn,))
+        cur.execute("SELECT 1 FROM Livre WHERE isbn = ?", (body.livre_demandeur_isbn,))
         if not cur.fetchone():
             conn.close()
             raise HTTPException(
@@ -711,7 +698,7 @@ def create_exchange(body: ExchangeCreate):
             )
 
         cur.execute(
-            "SELECT 1 FROM Livre WHERE isbn = %s",
+            "SELECT 1 FROM Livre WHERE isbn = ?",
             (body.livre_destinataire_isbn,),
         )
         if not cur.fetchone():
@@ -733,7 +720,7 @@ def create_exchange(body: ExchangeCreate):
                 date_creation,
                 date_derniere_maj
             )
-            VALUES (%s, %s, %s, %s, 'demande_envoyee', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES (?, ?, ?, ?, 'demande_envoyee', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """,
             (
                 CURRENT_USER_ID,
@@ -757,16 +744,16 @@ def create_exchange(body: ExchangeCreate):
                 date_creation,
                 date_derniere_maj
             FROM Echange
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (echange_id,),
         )
         row = cur.fetchone()
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return row_to_exchange(row)
@@ -805,28 +792,28 @@ def list_my_exchanges(
     params: list = []
 
     if role == "demandeur":
-        sql += " AND demandeur_id = %s"
+        sql += " AND demandeur_id = ?"
         params.append(CURRENT_USER_ID)
     elif role == "destinataire":
-        sql += " AND destinataire_id = %s"
+        sql += " AND destinataire_id = ?"
         params.append(CURRENT_USER_ID)
     else:
         # tous les échanges où je suis impliqué
-        sql += " AND (demandeur_id = %s OR destinataire_id = %s)"
+        sql += " AND (demandeur_id = ? OR destinataire_id = ?)"
         params.extend([CURRENT_USER_ID, CURRENT_USER_ID])
 
     if statut:
         if statut not in EXCHANGE_ALLOWED_STATUS:
             raise HTTPException(status_code=400, detail="Statut invalide")
-        sql += " AND statut = %s"
+        sql += " AND statut = ?"
         params.append(statut)
 
     try:
         cur.execute(sql, params)
         rows = cur.fetchall()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return [row_to_exchange(r) for r in rows]
@@ -845,7 +832,7 @@ def _get_exchange_for_update(cur, exchange_id: int):
             date_creation,
             date_derniere_maj
         FROM Echange
-        WHERE id_echange = %s
+        WHERE id_echange = ?
         """,
         (exchange_id,),
     )
@@ -884,7 +871,7 @@ def accept_exchange(exchange_id: int):
             UPDATE Echange
             SET statut = 'demande_acceptee',
                 date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
@@ -901,16 +888,16 @@ def accept_exchange(exchange_id: int):
                 date_creation,
                 date_derniere_maj
             FROM Echange
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
         updated = cur.fetchone()
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return row_to_exchange(updated)
@@ -945,7 +932,7 @@ def refuse_exchange(exchange_id: int):
             UPDATE Echange
             SET statut = 'demande_refusee',
                 date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
@@ -962,16 +949,16 @@ def refuse_exchange(exchange_id: int):
                 date_creation,
                 date_derniere_maj
             FROM Echange
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
         updated = cur.fetchone()
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return row_to_exchange(updated)
@@ -1006,7 +993,7 @@ def cancel_exchange(exchange_id: int):
             UPDATE Echange
             SET statut = 'annule',
                 date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
@@ -1023,16 +1010,16 @@ def cancel_exchange(exchange_id: int):
                 date_creation,
                 date_derniere_maj
             FROM Echange
-            WHERE id_echange = %s
+            WHERE id_echange = ?
             """,
             (exchange_id,),
         )
         updated = cur.fetchone()
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.rollback()
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return row_to_exchange(updated)
@@ -1063,7 +1050,7 @@ def add_or_update_rating(body: RatingBody):
 
     # Vérifier que le livre existe
     try:
-        cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (body.isbn,))
+        cur.execute("SELECT 1 FROM Livre WHERE isbn = ?", (body.isbn,))
         row = cur.fetchone()
         if not row:
             conn.close()
@@ -1074,7 +1061,7 @@ def add_or_update_rating(body: RatingBody):
             """
             SELECT id_evaluation
             FROM Evaluation
-            WHERE utilisateur_id = %s AND livre_isbn = %s
+            WHERE utilisateur_id = ? AND livre_isbn = ?
             """,
             (CURRENT_USER_ID, body.isbn),
         )
@@ -1085,8 +1072,8 @@ def add_or_update_rating(body: RatingBody):
             cur.execute(
                 """
                 UPDATE Evaluation
-                SET note = %s, avis = %s
-                WHERE utilisateur_id = %s AND livre_isbn = %s
+                SET note = ?, avis = ?
+                WHERE utilisateur_id = ? AND livre_isbn = ?
                 """,
                 (body.note, body.avis, CURRENT_USER_ID, body.isbn),
             )
@@ -1095,15 +1082,15 @@ def add_or_update_rating(body: RatingBody):
             cur.execute(
                 """
                 INSERT INTO Evaluation (utilisateur_id, livre_isbn, note, avis)
-                VALUES (%s, %s, %s, %s)
+                VALUES (?, ?, ?, ?)
                 """,
                 (CURRENT_USER_ID, body.isbn, body.note, body.avis),
             )
 
         conn.commit()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
     return RatingOut(isbn=body.isbn, note=body.note, avis=body.avis)
@@ -1125,7 +1112,7 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None)):
                 """
                 SELECT livre_isbn, note, avis
                 FROM Evaluation
-                WHERE utilisateur_id = %s AND livre_isbn = %s
+                WHERE utilisateur_id = ? AND livre_isbn = ?
                 """,
                 (CURRENT_USER_ID, isbn),
             )
@@ -1134,15 +1121,15 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None)):
                 """
                 SELECT livre_isbn, note, avis
                 FROM Evaluation
-                WHERE utilisateur_id = %s
+                WHERE utilisateur_id = ?
                 """,
                 (CURRENT_USER_ID,),
             )
 
         rows = cur.fetchall()
-    except Exception as e:
+    except sqlite3.Error as e:
         conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur SQLite: {e}")
 
     conn.close()
 
