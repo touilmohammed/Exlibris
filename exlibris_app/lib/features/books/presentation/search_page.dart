@@ -7,6 +7,7 @@ import '../../../models/book.dart';
 import '../../ratings/data/ratings_providers.dart';
 import '../../../models/rating.dart';
 import '../../ratings/data/ratings_repository.dart';
+import 'barcode_scanner_page.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
   const SearchPage({super.key});
@@ -25,6 +26,32 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void dispose() {
     _queryController.dispose();
     super.dispose();
+  }
+
+  Future<void> _scanIsbn() async {
+    // Ouvre la page de scan et récupère le code
+    final scanned = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+
+    // Si l’utilisateur a annulé, on ne fait rien
+    if (scanned == null || scanned.trim().isEmpty) return;
+
+    // On garde uniquement les chiffres (certains scanners renvoient des trucs comme "ISBN 978...").
+    final numeric = scanned.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (numeric.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Code scanné invalide')));
+      return;
+    }
+
+    // On met l’ISBN dans le champ de recherche
+    _queryController.text = numeric;
+
+    // Et on lance la recherche : ton _runSearch gère déjà l’ISBN 👍
+    await _runSearch();
   }
 
   Future<void> _runSearch() async {
@@ -262,9 +289,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             controller: _queryController,
             decoration: InputDecoration(
               labelText: 'Rechercher par titre, auteur, ISBN…',
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: _loading ? null : _runSearch,
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Scanner le code-barres',
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: _loading ? null : _scanIsbn,
+                  ),
+                  IconButton(
+                    tooltip: 'Rechercher',
+                    icon: const Icon(Icons.search),
+                    onPressed: _loading ? null : _runSearch,
+                  ),
+                ],
               ),
             ),
             onSubmitted: (_) => _runSearch(),
