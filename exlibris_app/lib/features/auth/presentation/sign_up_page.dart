@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/app_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../../core/app_toast.dart';
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -32,44 +33,18 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
             password: _password.text,
           );
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder:(context) {
-          return AlertDialog(
-            backgroundColor: const Color(0XFF1A3A3A),
-            title: const Text(
-              'Confirmez votre email (optionnel)',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-              ),
-            ),
-            content: TextFormField(
-              controller: _token,
-              decoration: const InputDecoration(
-                labelText: 'Token de confirmation',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  _token.text == '' ? null : await _submitConfirm();
-                },
-                child: const Text(
-                  'OK',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ),
-            ],
-          );
-        },
-      );
+      AppToast.success(context, 'Inscription réussie ! Connectez-vous.');
+      // Rediriger vers la page de connexion
+      AppRouter.goSignIn(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Échec inscription : $e')));
+      String errorMsg = 'Échec de l\'inscription';
+      if (e.toString().contains('409')) {
+        errorMsg = 'Cet email est déjà utilisé';
+      } else if (e.toString().contains('timeout') || e.toString().contains('connection')) {
+        errorMsg = 'Impossible de se connecter au serveur';
+      }
+      AppToast.error(context, errorMsg);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -82,14 +57,10 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
           .read(authRepositoryProvider)
           .confirmEmail(token: _token.text.trim());
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Email confirmé !')));
+      AppToast.success(context, 'Email confirmé !');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Échec confirmation : $e')));
+      AppToast.error(context, 'Échec de la confirmation');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

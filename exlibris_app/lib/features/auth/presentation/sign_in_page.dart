@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../../app_router.dart';
+import '../../../core/app_toast.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({super.key});
@@ -20,15 +21,22 @@ class _SignInPageState extends ConsumerState<SignInPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await ref
-          .read(authRepositoryProvider)
-          .signIn(email: _email.text.trim(), password: _password.text);
-      if (mounted) AppRouter.goHome(context);
+      await ref.read(authRepositoryProvider).signIn(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
+      if (!mounted) return;
+      AppRouter.goHome(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Connexion échouée : $e')));
+      // Affiche un message d'erreur convivial
+      String errorMsg = 'Identifiants incorrects';
+      if (e.toString().contains('401')) {
+        errorMsg = 'Email ou mot de passe incorrect';
+      } else if (e.toString().contains('timeout') || e.toString().contains('connection')) {
+        errorMsg = 'Impossible de se connecter au serveur';
+      }
+      AppToast.error(context, errorMsg);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

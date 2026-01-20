@@ -1,14 +1,32 @@
 
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../app_router.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../../models/book.dart';
+import '../../books/data/books_providers.dart';
+import '../../books/data/books_repository.dart';
+import '../../friends/data/friends_providers.dart';
+import '../../../models/friend.dart';
+
+final homeRecommendationsProvider = FutureProvider<List<Book>>((ref) async {
+  final repo = ref.read(booksRepositoryProvider);
+  return repo.searchBooks(query: ""); 
+});
 
 /// Page d'accueil principale ExLibris
 /// (feed avec Mes livres, Recommandation IA, Mes amis)
-class AccueilPage extends StatelessWidget {
+class AccueilPage extends ConsumerWidget {
   const AccueilPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final myBooksAsync = ref.watch(collectionProvider);
+    final recommendationsAsync = ref.watch(homeRecommendationsProvider);
+    final friendsAsync = ref.watch(friendsListProvider);
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -29,36 +47,42 @@ class AccueilPage extends StatelessWidget {
             children: [
               const _Header(),
               const SizedBox(height: 24),
-              const _SectionCard(
+              _SectionCard(
                 title: 'Mes livres',
-                child: _BooksCarousel(
-                  books: [
-                    _BookStub('Cendres de Annie'),
-                    _BookStub('Femmes du silence'),
-                    _BookStub('La brume des bois'),
-                  ],
+                child: myBooksAsync.when(
+                  data: (books) => books.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text("Aucun livre dans ta collection.", style: TextStyle(color: Colors.white70)),
+                        )
+                      : _BooksCarousel(books: books.take(10).toList()),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
                 ),
               ),
               const SizedBox(height: 16),
-              const _SectionCard(
+              _SectionCard(
                 title: 'Recommandation IA',
-                child: _BooksCarousel(
-                  books: [
-                    _BookStub('Jeux sans loi'),
-                    _BookStub('This is the first poem I wrote'),
-                    _BookStub('My Heart Bleeds Ink'),
-                  ],
+                child: recommendationsAsync.when(
+                  data: (books) => books.isEmpty
+                      ? const Text("Aucune recommandation.", style: TextStyle(color: Colors.white70))
+                      : _BooksCarousel(books: books.take(10).toList()),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
                 ),
               ),
               const SizedBox(height: 16),
-              const _SectionCard(
+              _SectionCard(
                 title: 'Mes amis',
-                child: _FriendsStrip(
-                  friends: [
-                    _FriendStub('Meli'),
-                    _FriendStub('TIMoche'),
-                    _FriendStub('Eve'),
-                  ],
+                child: friendsAsync.when(
+                  data: (friends) => friends.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text("Aucun ami ajouté.", style: TextStyle(color: Colors.white70)),
+                        )
+                      : _FriendsStrip(friends: friends),
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
                 ),
               ),
               const SizedBox(height: 32),
@@ -71,11 +95,11 @@ class AccueilPage extends StatelessWidget {
 }
 
 /// En-tête avec logo/nom de l'app et avatar utilisateur
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -99,18 +123,55 @@ class _Header extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withOpacity(0.5),
-              width: 1.2,
+        PopupMenuButton<String>(
+          onSelected: (value) async {
+            if (value == 'logout') {
+              await ref.read(authRepositoryProvider).signOut();
+              if (context.mounted) AppRouter.goSignIn(context);
+            } else if (value == 'profile') {
+              context.push('/profile');
+            }
+          },
+          color: const Color(0xFF1A3A3A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          itemBuilder: (context) => [
+            const PopupMenuItem(
+              value: 'profile',
+              child: Row(
+                children: [
+                  Icon(Icons.person, color: Colors.white70, size: 20),
+                  SizedBox(width: 8),
+                  Text('Mon Profil', style: TextStyle(color: Colors.white)),
+                ],
+              ),
             ),
-            image: const DecorationImage(
-              fit: BoxFit.cover,
-              image: AssetImage('assets/images/avatar_placeholder.png'),
+            const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout, color: Colors.white70, size: 20),
+                  SizedBox(width: 8),
+                  Text('Déconnexion', style: TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+          ],
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.1),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.5),
+                width: 1.2,
+              ),
+            ),
+            child: const Icon(
+              Icons.person,
+              color: Colors.white70,
+              size: 24,
             ),
           ),
         ),
@@ -169,15 +230,9 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-/// Modèle simplifié pour représenter un livre (placeholder)
-class _BookStub {
-  final String title;
-  const _BookStub(this.title);
-}
-
 /// Bandeau horizontal de livres
 class _BooksCarousel extends StatelessWidget {
-  final List<_BookStub> books;
+  final List<Book> books;
 
   const _BooksCarousel({required this.books});
 
@@ -191,7 +246,7 @@ class _BooksCarousel extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final book = books[index];
-          return _BookCard(title: book.title);
+          return _BookCard(book: book);
         },
       ),
     );
@@ -199,37 +254,53 @@ class _BooksCarousel extends StatelessWidget {
 }
 
 class _BookCard extends StatelessWidget {
-  final String title;
+  final Book book;
 
-  const _BookCard({required this.title});
+  const _BookCard({required this.book});
 
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 3 / 4,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF1F2933),
-              Color(0xFF111827),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      child: InkWell(
+        onTap: () => context.push('/book', extra: book),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: const Color(0xFF1F2933),
+            image: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
+                ? DecorationImage(
+                    image: NetworkImage(book.imagePetite!),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
-        ),
-        padding: const EdgeInsets.all(8),
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.8),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            padding: const EdgeInsets.all(8),
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                book.titre,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
         ),
@@ -238,15 +309,11 @@ class _BookCard extends StatelessWidget {
   }
 }
 
-/// Modèle simplifié pour un ami
-class _FriendStub {
-  final String name;
-  const _FriendStub(this.name);
-}
+
 
 /// Bandeau horizontal Mes Amis
 class _FriendsStrip extends StatelessWidget {
-  final List<_FriendStub> friends;
+  final List<Friend> friends;
 
   const _FriendsStrip({required this.friends});
 
@@ -265,10 +332,15 @@ class _FriendsStrip extends StatelessWidget {
             children: [
               Stack(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 24,
-                    backgroundImage: AssetImage(
-                      'assets/images/avatar_placeholder.png',
+                    backgroundColor: Colors.white.withOpacity(0.1),
+                    child: Text(
+                      friend.nom.isNotEmpty ? friend.nom[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   Positioned(
@@ -287,7 +359,7 @@ class _FriendsStrip extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                friend.name,
+                friend.nom,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 11,

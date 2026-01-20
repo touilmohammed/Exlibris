@@ -64,7 +64,7 @@ class FriendsRepository {
 
   /// Supprimer un ami
   Future<void> removeFriend(int friendId) async {
-    await _dio.post('/friends/$friendId');
+    await _dio.delete('/friends/$friendId');
   }
 
   /// Recherche de nouveaux amis

@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/presentation/sign_in_page.dart';
 import 'features/auth/presentation/sign_up_page.dart';
 import 'features/home/presentation/home_page.dart';
+import 'features/profile/presentation/profile_page.dart';
+import 'features/books/presentation/book_details_page.dart';
+import 'models/book.dart';
 import 'core/token_storage.dart';
 
 class AppRouter {
@@ -17,6 +20,14 @@ class AppRouter {
       GoRoute(path: '/signin', builder: (context, state) => const SignInPage()),
       GoRoute(path: '/signup', builder: (context, state) => const SignUpPage()),
       GoRoute(path: '/home', builder: (context, state) => const HomePage()),
+      GoRoute(path: '/profile', builder: (context, state) => const ProfilePage()),
+      GoRoute(
+        path: '/book',
+        builder: (context, state) {
+          final book = state.extra as Book;
+          return BookDetailsPage(book: book);
+        },
+      ),
     ],
   );
 
@@ -44,6 +55,10 @@ class _DecidePageState extends State<_DecidePage> {
   }
 
   Future<void> _check() async {
+    // Effacer l'ancien token pour forcer une nouvelle connexion
+    // TODO: Supprimer cette ligne après le premier test réussi
+    await TokenStorage.clear();
+    
     final token = await TokenStorage.read();
     if (!mounted) return;
     if (token == null) {

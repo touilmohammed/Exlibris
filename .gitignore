@@ -1,2 +1,5 @@
 /.idea/
 /.vscode/
+/exlibris_api/venv/
+/exlibris_app/venv/
+/exlibris_api/__pycache__/

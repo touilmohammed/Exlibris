@@ -4,6 +4,9 @@ class Book {
   final String auteur;
   final String? categorie;
   final String? imagePetite;
+  final String? resume;
+  final String? editeur;
+  final String? langue;
 
   Book({
     required this.isbn,
@@ -11,6 +14,9 @@ class Book {
     required this.auteur,
     this.categorie,
     this.imagePetite,
+    this.resume,
+    this.editeur,
+    this.langue,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -20,6 +26,9 @@ class Book {
       auteur: json['auteur']?.toString() ?? '',
       categorie: json['categorie']?.toString(),
       imagePetite: json['image_petite']?.toString(),
+      resume: json['resume']?.toString(),
+      editeur: json['editeur']?.toString(),
+      langue: json['langue']?.toString(),
     );
   }
 
@@ -30,6 +39,9 @@ class Book {
       'auteur': auteur,
       'categorie': categorie,
       'image_petite': imagePetite,
+      'resume': resume,
+      'editeur': editeur,
+      'langue': langue,
     };
   }
 

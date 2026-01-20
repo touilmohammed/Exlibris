@@ -8,6 +8,7 @@ import '../../books/presentation/wishlist_page.dart';
 import '../../friends/presentation/friends_page.dart';
 import '../../accueil/presentation/accueil_page.dart';
 import '../../../app_router.dart';
+import '../../../core/app_theme.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -20,38 +21,33 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   int _currentIndex = 0;
 
+  // Pages matching navigation order
   List<Widget> get _pages => const [
-    AccueilPage(),
-    SearchPage(),
-    CollectionPage(),
-    WishlistPage(),
-    FriendsPage(),
-  ];
+        AccueilPage(),     // 0: Accueil
+        CollectionPage(),  // 1: Collection
+        WishlistPage(),    // 2: Souhaits
+        FriendsPage(),     // 3: Amis
+        SearchPage(),      // 4: Explorer
+      ];
+
+  void _logout() async {
+    await ref.read(authRepositoryProvider).signOut();
+    if (mounted) AppRouter.goSignIn(context);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      appBar: _currentIndex == 0
-          ? null
-          : AppBar(
-              title: const Text('ExLibris'),
-              actions: [
-                IconButton(
-                  tooltip: 'Se déconnecter',
-                  onPressed: () async {
-                    await ref.read(authRepositoryProvider).signOut();
-                    if (context.mounted) AppRouter.goSignIn(context);
-                  },
-                  icon: const Icon(Icons.logout),
-                ),
-              ],
-            ),
+      backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
+          // Page content
           Positioned.fill(
             child: _pages[_currentIndex],
           ),
+
+          // Bottom navigation
           Align(
             alignment: Alignment.bottomCenter,
             child: SafeArea(
@@ -66,19 +62,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xD9FFFFFF),
-                            const Color(0x99FFFFFF),
+                            Colors.white.withOpacity(0.15),
+                            Colors.white.withOpacity(0.08),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          width: 1.2,
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
+                            color: Colors.black.withOpacity(0.25),
                             blurRadius: 24,
                             offset: const Offset(0, 10),
                           ),
@@ -90,35 +86,35 @@ class _HomePageState extends ConsumerState<HomePage> {
                           _GlassNavItem(
                             index: 0,
                             currentIndex: _currentIndex,
-                            icon: Icons.home,
+                            icon: Icons.home_rounded,
                             label: 'Accueil',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 1,
                             currentIndex: _currentIndex,
-                            icon: Icons.library_books,
+                            icon: Icons.library_books_rounded,
                             label: 'Collection',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 2,
                             currentIndex: _currentIndex,
-                            icon: Icons.favorite,
+                            icon: Icons.favorite_rounded,
                             label: 'Souhaits',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 3,
                             currentIndex: _currentIndex,
-                            icon: Icons.people,
+                            icon: Icons.people_rounded,
                             label: 'Amis',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 4,
                             currentIndex: _currentIndex,
-                            icon: Icons.search,
+                            icon: Icons.search_rounded,
                             label: 'Explorer',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
@@ -131,20 +127,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class FriendsPlaceholderPage extends StatelessWidget {
-  const FriendsPlaceholderPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Fonctionnalités amis / suggestions\nà implémenter plus tard.',
-        textAlign: TextAlign.center,
       ),
     );
   }
@@ -176,25 +158,26 @@ class _GlassNavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: isActive ? 26 : 22,
-              color: isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isActive ? AppColors.success.withOpacity(0.2) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: isActive ? 24 : 22,
+                color: isActive ? AppColors.success : Colors.white.withOpacity(0.6),
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.7),
+                color: isActive ? AppColors.success : Colors.white.withOpacity(0.6),
               ),
             ),
           ],

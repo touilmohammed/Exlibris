@@ -3,15 +3,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 import pymysql
+import os
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis .env.local
+load_dotenv('.env.local')
 
 # --------------------------------------------------------------------
-# Config BDD MariaDB
+# Config BDD MariaDB (depuis .env)
 # --------------------------------------------------------------------
-DB_HOST = "87.106.141.247"
-DB_PORT = 3306
-DB_USER = "exlibris"
-DB_PASSWORD = "exlibris2b"
-DB_NAME = "exlibris"
+DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_USER = os.getenv("DB_USER", "exlibris")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_NAME = os.getenv("DB_NAME", "exlibris")
 
 # Pour l’instant : on suppose que l'utilisateur connecté a l'id 1
 CURRENT_USER_ID = 1
@@ -75,6 +80,10 @@ class Book(BaseModel):
     auteur: str
     categorie: Optional[str] = None
     image_petite: Optional[str] = None
+    resume: Optional[str] = None
+    editeur: Optional[str] = None
+    langue: Optional[str] = None
+    note_moyenne: Optional[float] = None
 
 
 class AddItem(BaseModel):
@@ -124,10 +133,9 @@ def row_to_exchange(row) -> ExchangeOut:
 
 
 # --------------------------------------------------------------------
-# Stockage mock pour les users (pour le proto)
+# Stockage des tokens actifs (pour le proto)
 # --------------------------------------------------------------------
-USERS: dict[str, dict] = {}  # email -> {nom_utilisateur, mot_de_passe, confirmed}
-TOKENS: set[str] = set()  # pseudo tokens d'accès (debug)
+TOKENS: dict[str, int] = {}  # token -> user_id
 
 
 # --------------------------------------------------------------------
@@ -139,36 +147,82 @@ def health():
 
 
 # --------------------------------------------------------------------
-# Auth (mock)
+# Auth (base de données)
 # --------------------------------------------------------------------
 @app.post("/auth/signup")
 def signup(body: SignUpBody):
-    if body.email in USERS:
-        raise HTTPException(status_code=409, detail="Email déjà utilisé")
+    """Inscription d'un nouvel utilisateur dans la table Utilisateur."""
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-    USERS[body.email] = {
-        "nom_utilisateur": body.nom_utilisateur,
-        "mot_de_passe": body.mot_de_passe,  # ⚠️ à remplacer par un hash plus tard
-        "confirmed": True,  # on passe direct à confirmé pour simplifier le proto
-    }
-    return {"ok": True}
+    try:
+        # Vérifier si l'email existe déjà
+        cur.execute("SELECT 1 FROM Utilisateur WHERE email = %s", (body.email,))
+        if cur.fetchone():
+            conn.close()
+            raise HTTPException(status_code=409, detail="Email déjà utilisé")
+
+        # Insérer le nouvel utilisateur
+        cur.execute(
+            """
+            INSERT INTO Utilisateur (nom_utilisateur, email, mot_de_passe)
+            VALUES (%s, %s, %s)
+            """,
+            (body.nom_utilisateur, body.email, body.mot_de_passe),
+        )
+        conn.commit()
+        user_id = cur.lastrowid
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+
+    conn.close()
+    return {"ok": True, "user_id": user_id}
 
 
 @app.post("/auth/login")
 def login(body: LoginBody):
-    user = USERS.get(body.email)
-    if not user or user["mot_de_passe"] != body.mot_de_passe:
+    """Connexion d'un utilisateur existant."""
+    global CURRENT_USER_ID
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            """
+            SELECT id_utilisateur, mot_de_passe FROM Utilisateur WHERE email = %s
+            """,
+            (body.email,),
+        )
+        row = cur.fetchone()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+
+    conn.close()
+
+    if not row or row[1] != body.mot_de_passe:
         raise HTTPException(status_code=401, detail="Identifiants invalides")
 
-    token = "debug-token"  # plus tard : JWT avec user_id
-    TOKENS.add(token)
-    return {"token": token}
+    user_id = row[0]
+    # Générer un token simple (en prod : utiliser JWT)
+    import secrets
+    token = secrets.token_hex(16)
+    TOKENS[token] = user_id
+
+    # Mettre à jour l'utilisateur courant pour les autres endpoints
+    CURRENT_USER_ID = user_id
+
+    return {"token": token, "user_id": user_id}
 
 
 @app.post("/auth/confirm")
 def confirm(body: ConfirmBody):
-    # Démo : on accepte n'importe quel token
-    return {"ok": True, "message": "Email confirmé (mock)"}
+    # Pour l'instant, on accepte n'importe quel token
+    return {"ok": True, "message": "Email confirmé"}
 
 
 # --------------------------------------------------------------------
@@ -211,8 +265,9 @@ def search_livres(
     cur = conn.cursor()
 
     sql = """
-        SELECT isbn, titre, auteur, categorie, image_petite
-        FROM Livre
+        SELECT l.isbn, l.titre, l.auteur, c.nomcat, l.image_petite, l.resume, l.editeur, l.langue
+        FROM Livre l
+        LEFT JOIN Categorie c ON c.id = l.categorie_id
     """
     clauses = []
     params: list = []
@@ -253,6 +308,9 @@ def search_livres(
             auteur=row[2] or "",
             categorie=row[3],
             image_petite=row[4],
+            resume=row[5],
+            editeur=row[6],
+            langue=row[7],
         )
         for row in rows
     ]
@@ -271,11 +329,12 @@ def get_collection():
     cur = conn.cursor()
 
     sql = """
-        SELECT l.isbn, l.titre, l.auteur, l.categorie, l.image_petite
-        FROM Collection c
-        JOIN Livre l ON l.isbn = c.livre_isbn
-        WHERE c.utilisateur_id = %s
-        ORDER BY c.date_ajout DESC
+        SELECT l.isbn, l.titre, l.auteur, cat.nomcat, l.image_petite, l.resume, l.editeur, l.langue
+        FROM Collection col
+        JOIN Livre l ON l.isbn = col.livre_isbn
+        LEFT JOIN Categorie cat ON cat.id = l.categorie_id
+        WHERE col.utilisateur_id = %s
+        ORDER BY col.date_ajout DESC
     """
 
     try:
@@ -294,6 +353,9 @@ def get_collection():
             auteur=row[2] or "",
             categorie=row[3],
             image_petite=row[4],
+            resume=row[5],
+            editeur=row[6],
+            langue=row[7],
         )
         for row in rows
     ]
@@ -396,9 +458,10 @@ def get_wishlist():
     try:
         cur.execute(
             """
-            SELECT l.isbn, l.titre, l.auteur, l.categorie, l.image_petite
+            SELECT l.isbn, l.titre, l.auteur, cat.nomcat, l.image_petite, l.resume, l.editeur, l.langue
             FROM Souhait s
             JOIN Livre l ON l.isbn = s.livre_isbn
+            LEFT JOIN Categorie cat ON cat.id = l.categorie_id
             WHERE s.utilisateur_id = %s
             ORDER BY s.date_ajout DESC
             """,
@@ -418,6 +481,9 @@ def get_wishlist():
             auteur=row[2] or "",
             categorie=row[3],
             image_petite=row[4],
+            resume=row[5],
+            editeur=row[6],
+            langue=row[7],
         )
         for row in rows
     ]
@@ -506,7 +572,7 @@ def remove_wishlist(
 
 
 # --------------------------------------------------------------------
-# Amis (proto en mémoire)
+# Amis (depuis la base de données)
 # --------------------------------------------------------------------
 class Friend(BaseModel):
     id: int
@@ -541,70 +607,147 @@ CANDIDATE_FRIENDS: list[Friend] = [
 
 @app.get("/friends", response_model=List[Friend])
 def get_friends():
-    return FRIENDS
+    """Récupère la liste des amis confirmés de l'utilisateur courant."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            SELECT u.id_utilisateur, u.nom_utilisateur
+            FROM Amitie a
+            JOIN Utilisateur u ON (
+                (a.utilisateur_1_id = %s AND a.utilisateur_2_id = u.id_utilisateur)
+                OR (a.utilisateur_2_id = %s AND a.utilisateur_1_id = u.id_utilisateur)
+            )
+            WHERE a.statut = 'accepte'
+        """
+        cur.execute(sql, (CURRENT_USER_ID, CURRENT_USER_ID))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
+    return [Friend(id=row[0], nom=row[1]) for row in rows]
 
 
 @app.get("/friends/requests", response_model=List[Friend])
 def get_friend_requests_incoming():
-    """Ancienne route pour compat, renvoie les demandes reçues."""
-    return PENDING_FRIEND_REQUESTS_INCOMING
+    """Demandes d'amis reçues (en attente)."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            SELECT u.id_utilisateur, u.nom_utilisateur
+            FROM Amitie a
+            JOIN Utilisateur u ON a.utilisateur_1_id = u.id_utilisateur
+            WHERE a.utilisateur_2_id = %s AND a.statut = 'en_attente'
+        """
+        cur.execute(sql, (CURRENT_USER_ID,))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
+    return [Friend(id=row[0], nom=row[1]) for row in rows]
 
 
 @app.get("/friends/requests/incoming", response_model=List[Friend])
 def get_friend_requests_incoming_alias():
-    """Alias plus explicite (reçues)."""
-    return PENDING_FRIEND_REQUESTS_INCOMING
+    """Alias pour les demandes reçues."""
+    return get_friend_requests_incoming()
 
 
 @app.get("/friends/requests-outgoing", response_model=List[Friend])
 def get_friend_requests_outgoing():
-    """Demandes envoyées par l’utilisateur courant."""
-    return PENDING_FRIEND_REQUESTS_OUTGOING
+    """Demandes d'amis envoyées (en attente)."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            SELECT u.id_utilisateur, u.nom_utilisateur
+            FROM Amitie a
+            JOIN Utilisateur u ON a.utilisateur_2_id = u.id_utilisateur
+            WHERE a.utilisateur_1_id = %s AND a.statut = 'en_attente'
+        """
+        cur.execute(sql, (CURRENT_USER_ID,))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
+    return [Friend(id=row[0], nom=row[1]) for row in rows]
 
 
-@app.post("/friends/{friend_id}")
+@app.delete("/friends/{friend_id}")
 def remove_friend(friend_id: int):
-    """Suppression simple d'un ami."""
-    global FRIENDS
-    before = len(FRIENDS)
-    FRIENDS = [f for f in FRIENDS if f.id != friend_id]
-    if len(FRIENDS) == before:
-        raise HTTPException(status_code=404, detail="Ami non trouvé")
+    """Supprimer un ami."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            DELETE FROM Amitie 
+            WHERE (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+               OR (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+        """
+        cur.execute(sql, (CURRENT_USER_ID, friend_id, friend_id, CURRENT_USER_ID))
+        conn.commit()
+        if cur.rowcount == 0:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Ami non trouvé")
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
     return {"ok": True}
 
 
 @app.post("/friends/requests/{friend_id}/accept")
 def accept_friend_request(friend_id: int):
-    """
-    Accepter une demande d'ami reçue:
-      - retirer de PENDING_FRIEND_REQUESTS_INCOMING
-      - ajouter à FRIENDS
-    """
-    friend = next(
-        (f for f in PENDING_FRIEND_REQUESTS_INCOMING if f.id == friend_id),
-        None,
-    )
-    if not friend:
-        raise HTTPException(status_code=404, detail="Demande non trouvée")
-
-    PENDING_FRIEND_REQUESTS_INCOMING.remove(friend)
-    if not any(f.id == friend.id for f in FRIENDS):
-        FRIENDS.append(friend)
-
+    """Accepter une demande d'ami reçue."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            UPDATE Amitie 
+            SET statut = 'accepte'
+            WHERE utilisateur_1_id = %s AND utilisateur_2_id = %s AND statut = 'en_attente'
+        """
+        cur.execute(sql, (friend_id, CURRENT_USER_ID))
+        conn.commit()
+        if cur.rowcount == 0:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Demande non trouvée")
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
     return {"ok": True}
 
 
 @app.post("/friends/requests/{friend_id}/refuse")
 def refuse_friend_request(friend_id: int):
-    """Refuser (supprimer) une demande d'ami reçue."""
-    friend = next(
-        (f for f in PENDING_FRIEND_REQUESTS_INCOMING if f.id == friend_id),
-        None,
-    )
-    if not friend:
-        raise HTTPException(status_code=404, detail="Demande non trouvée")
-
-    PENDING_FRIEND_REQUESTS_INCOMING.remove(friend)
+    """Refuser une demande d'ami reçue."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            DELETE FROM Amitie 
+            WHERE utilisateur_1_id = %s AND utilisateur_2_id = %s AND statut = 'en_attente'
+        """
+        cur.execute(sql, (friend_id, CURRENT_USER_ID))
+        conn.commit()
+        if cur.rowcount == 0:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Demande non trouvée")
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
     return {"ok": True}
 
 
@@ -612,52 +755,77 @@ def refuse_friend_request(friend_id: int):
 def search_friends(
     q: str = Query(..., description="Nom / pseudo de la personne à rechercher"),
 ):
-    """
-    Recherche dans CANDIDATE_FRIENDS (ceux qui ne sont pas déjà amis ou en attente).
-    """
+    """Recherche d'utilisateurs (exclut les amis et demandes en cours)."""
     q_lower = q.lower().strip()
     if not q_lower:
         return []
-
-    taken_ids = {f.id for f in FRIENDS} \
-        | {f.id for f in PENDING_FRIEND_REQUESTS_INCOMING} \
-        | {f.id for f in PENDING_FRIEND_REQUESTS_OUTGOING}
-
-    results = [
-        f
-        for f in CANDIDATE_FRIENDS
-        if f.id not in taken_ids and q_lower in f.nom.lower()
-    ]
-    return results
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        sql = """
+            SELECT u.id_utilisateur, u.nom_utilisateur
+            FROM Utilisateur u
+            WHERE u.id_utilisateur != %s
+              AND LOWER(u.nom_utilisateur) LIKE %s
+              AND u.id_utilisateur NOT IN (
+                  SELECT CASE 
+                      WHEN a.utilisateur_1_id = %s THEN a.utilisateur_2_id 
+                      ELSE a.utilisateur_1_id 
+                  END
+                  FROM Amitie a
+                  WHERE a.utilisateur_1_id = %s OR a.utilisateur_2_id = %s
+              )
+            LIMIT 20
+        """
+        cur.execute(sql, (CURRENT_USER_ID, f"%{q_lower}%", CURRENT_USER_ID, CURRENT_USER_ID, CURRENT_USER_ID))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
+    return [Friend(id=row[0], nom=row[1]) for row in rows]
 
 
 @app.post("/friends/requests/{friend_id}")
 def send_friend_request(friend_id: int):
-    """
-    Envoyer une nouvelle demande d'ami :
-      - Vérifie qu’on n’est pas déjà amis
-      - Vérifie qu’il n’y a pas déjà une demande (reçue ou envoyée)
-      - Ajoute la personne dans PENDING_FRIEND_REQUESTS_OUTGOING
-    """
-    # déjà ami ?
-    if any(f.id == friend_id for f in FRIENDS):
-        raise HTTPException(status_code=400, detail="Déjà ami avec cette personne")
-
-    # déjà une demande (reçue ou envoyée) ?
-    if any(f.id == friend_id for f in PENDING_FRIEND_REQUESTS_INCOMING) or any(
-        f.id == friend_id for f in PENDING_FRIEND_REQUESTS_OUTGOING
-    ):
-        raise HTTPException(status_code=400, detail="Demande déjà en attente")
-
-    # existe dans les candidats ?
-    friend = next(
-        (f for f in CANDIDATE_FRIENDS if f.id == friend_id),
-        None,
-    )
-    if not friend:
-        raise HTTPException(status_code=404, detail="Utilisateur inconnu")
-
-    PENDING_FRIEND_REQUESTS_OUTGOING.append(friend)
+    """Envoyer une demande d'ami."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Vérifier que l'utilisateur existe
+        cur.execute("SELECT 1 FROM Utilisateur WHERE id_utilisateur = %s", (friend_id,))
+        if not cur.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Utilisateur inconnu")
+        
+        # Ne pas s'ajouter soi-même
+        if friend_id == CURRENT_USER_ID:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous ajouter vous-même")
+        
+        # Vérifier qu'il n'y a pas déjà une relation
+        cur.execute("""
+            SELECT 1 FROM Amitie 
+            WHERE (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+               OR (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+        """, (CURRENT_USER_ID, friend_id, friend_id, CURRENT_USER_ID))
+        if cur.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail="Demande déjà existante ou déjà amis")
+        
+        # Créer la demande
+        cur.execute("""
+            INSERT INTO Amitie (utilisateur_1_id, utilisateur_2_id, statut)
+            VALUES (%s, %s, 'en_attente')
+        """, (CURRENT_USER_ID, friend_id))
+        conn.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
     return {"ok": True}
 
 

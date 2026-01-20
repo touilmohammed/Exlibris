@@ -14,3 +14,12 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+
+# Info 
+
+1. cp .env .env.local
+2. ajoute les info de la bdd
+3. flutter pub get
+4. flutter run
+5. uvicorn main:app --reload --host 0.0.0.0 --port 8000
