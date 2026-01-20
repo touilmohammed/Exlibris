@@ -18,8 +18,15 @@ samples, guidance on mobile development, and a full API reference.
 
 # Info 
 
-1. cp .env .env.local
-2. ajoute les info de la bdd
+## FRONT
+1. dans le .env.loca ajouter: 
+API_BASE_URL=http://87.106.141.247/exlibris-api
 3. flutter pub get
 4. flutter run
-5. uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+## Pour aller sur php my admin sur le back
+
+http://87.106.141.247/phpmyadmin
+
+user: exlibris
+mdp: exlibris2b
