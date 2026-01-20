@@ -74,6 +74,16 @@ class ConfirmBody(BaseModel):
     token: str
 
 
+class UserProfile(BaseModel):
+    id: int
+    nom_utilisateur: str
+    email: str
+    avatar_url: Optional[str] = None
+    nb_livres_collection: int = 0
+    nb_livres_wishlist: int = 0
+    nb_amis: int = 0
+
+
 class Book(BaseModel):
     isbn: str
     titre: str
@@ -223,6 +233,52 @@ def login(body: LoginBody):
 def confirm(body: ConfirmBody):
     # Pour l'instant, on accepte n'importe quel token
     return {"ok": True, "message": "Email confirmé"}
+
+
+@app.get("/me/profile", response_model=UserProfile)
+def get_my_profile():
+    """Récupère les infos du profil de l'utilisateur courant + stats."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Infos user
+        cur.execute(
+            "SELECT id_utilisateur, nom_utilisateur, email FROM Utilisateur WHERE id_utilisateur = %s",
+            (CURRENT_USER_ID,)
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+        
+        # Stats
+        cur.execute("SELECT COUNT(*) FROM Collection WHERE utilisateur_id = %s", (CURRENT_USER_ID,))
+        nb_col = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM Souhait WHERE utilisateur_id = %s", (CURRENT_USER_ID,))
+        nb_wish = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT COUNT(*) FROM Amitie 
+            WHERE (utilisateur_1_id = %s OR utilisateur_2_id = %s) 
+              AND statut = 'accepte'
+        """, (CURRENT_USER_ID, CURRENT_USER_ID))
+        nb_amis = cur.fetchone()[0]
+
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    conn.close()
+    
+    return UserProfile(
+        id=row[0],
+        nom_utilisateur=row[1],
+        email=row[2],
+        avatar_url=None,
+        nb_livres_collection=nb_col,
+        nb_livres_wishlist=nb_wish,
+        nb_amis=nb_amis
+    )
 
 
 # --------------------------------------------------------------------

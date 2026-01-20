@@ -3,3 +3,4 @@
 /exlibris_api/venv/
 /exlibris_app/venv/
 /exlibris_api/__pycache__/
+exlibris_app/.env.local
