@@ -7,6 +7,12 @@ import '../../auth/data/auth_repository.dart';
 import '../data/profile_repository.dart';
 import '../domain/user_profile.dart';
 
+
+import '../../books/data/books_providers.dart';
+import '../../exchanges/data/exchanges_providers.dart';
+import '../../friends/data/friends_providers.dart';
+import '../../ratings/data/ratings_providers.dart';
+
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -46,7 +52,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _logout() async {
+    // 1. Déconnexion via le repo (suppression du token)
     await ref.read(authRepositoryProvider).signOut();
+
+    // 2. Invalider tous les providers utilisateurs pour vider le cache/état
+    ref.invalidate(collectionProvider);
+    ref.invalidate(wishlistProvider);
+    ref.invalidate(myExchangesProvider);
+    ref.invalidate(friendsListProvider);
+    ref.invalidate(incomingFriendRequestsProvider);
+    ref.invalidate(outgoingFriendRequestsProvider);
+    ref.invalidate(myRatingsProvider);
+
+    // 3. Redirection
     if (mounted) context.go('/sign-in');
   }
 
@@ -123,6 +141,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
           const SizedBox(height: 48),
           _buildStatsRow(),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.swap_horiz, color: AppColors.accent),
+              label: const Text('Mes propositions', style: TextStyle(color: Colors.white)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.accent),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              onPressed: () => context.push('/my-exchanges'),
+            ),
+          ),
         ],
       ),
     );

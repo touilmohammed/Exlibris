@@ -4,13 +4,13 @@ import '../../../models/friend.dart';
 import 'friends_repository.dart';
 
 /// Liste de mes amis
-final friendsListProvider = FutureProvider<List<Friend>>((ref) async {
+final friendsListProvider = FutureProvider.autoDispose<List<Friend>>((ref) async {
   final repo = ref.read(friendsRepositoryProvider);
   return repo.getFriends();
 });
 
 /// Liste des demandes d’amis reçues
-final incomingFriendRequestsProvider = FutureProvider<List<Friend>>((
+final incomingFriendRequestsProvider = FutureProvider.autoDispose<List<Friend>>((
   ref,
 ) async {
   final repo = ref.read(friendsRepositoryProvider);
@@ -18,7 +18,7 @@ final incomingFriendRequestsProvider = FutureProvider<List<Friend>>((
 });
 
 /// Liste des demandes d’amis envoyées (en attente)
-final outgoingFriendRequestsProvider = FutureProvider<List<Friend>>((
+final outgoingFriendRequestsProvider = FutureProvider.autoDispose<List<Friend>>((
   ref,
 ) async {
   final repo = ref.read(friendsRepositoryProvider);

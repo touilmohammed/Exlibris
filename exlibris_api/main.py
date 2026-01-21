@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
@@ -18,8 +18,7 @@ DB_USER = os.getenv("DB_USER", "exlibris")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "exlibris")
 
-# Pour l’instant : on suppose que l'utilisateur connecté a l'id 1
-CURRENT_USER_ID = 1
+
 
 
 def get_db_connection():
@@ -119,26 +118,26 @@ class ExchangeCreate(BaseModel):
 
 
 class ExchangeOut(BaseModel):
-    id_echange: int
-    demandeur_id: int
-    destinataire_id: int
+    id_demande: int
+    expediteur_id: int
     livre_demandeur_isbn: str
+    livre_demandeur_titre: Optional[str] = None
     livre_destinataire_isbn: str
+    livre_destinataire_titre: Optional[str] = None
     statut: str
-    date_creation: Optional[str] = None
-    date_derniere_maj: Optional[str] = None
+    date_echange: Optional[str] = None
 
 
 def row_to_exchange(row) -> ExchangeOut:
     return ExchangeOut(
-        id_echange=row[0],
-        demandeur_id=row[1],
-        destinataire_id=row[2],
-        livre_demandeur_isbn=row[3],
+        id_demande=row[0],
+        expediteur_id=row[1],
+        livre_demandeur_isbn=row[2],
+        livre_demandeur_titre=row[3],
         livre_destinataire_isbn=row[4],
-        statut=row[5],
-        date_creation=row[6],
-        date_derniere_maj=row[7],
+        livre_destinataire_titre=row[5],
+        statut=row[6],
+        date_echange=str(row[7]) if row[7] else None,
     )
 
 
@@ -154,6 +153,39 @@ TOKENS: dict[str, int] = {}  # token -> user_id
 @app.get("/")
 def health():
     return {"ok": True, "service": "ExLibris API", "db": DB_NAME}
+
+
+# --------------------------------------------------------------------
+# Auth (base de données)
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
+# Sécurité / Dépendance user courant
+# --------------------------------------------------------------------
+from fastapi import Header
+
+def get_current_user_id(authorization: Optional[str] = Header(None)) -> int:
+    """
+    Récupère l'ID utilisateur depuis le header Authorization: Bearer <token>.
+    Vérifie la présence du token dans le dictionnaire TOKENS.
+    """
+    if not authorization:
+        print("AUTH DEBUG: No Authorization header")
+        raise HTTPException(status_code=401, detail="Token manquant")
+    
+    parts = authorization.split(" ")
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        print(f"AUTH DEBUG: Invalid format: {authorization}")
+        raise HTTPException(status_code=401, detail="Format Authorization invalide")
+    
+    token = parts[1]
+    user_id = TOKENS.get(token)
+    print(f"AUTH DEBUG: Token received: {token[:6]}... -> User ID resolved: {user_id}")
+
+    if not user_id:
+         print("AUTH DEBUG: Token not found in TOKENS")
+         raise HTTPException(status_code=401, detail="Token invalide ou expiré")
+    
+    return user_id
 
 
 # --------------------------------------------------------------------
@@ -196,7 +228,6 @@ def signup(body: SignUpBody):
 @app.post("/auth/login")
 def login(body: LoginBody):
     """Connexion d'un utilisateur existant."""
-    global CURRENT_USER_ID
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -222,9 +253,7 @@ def login(body: LoginBody):
     import secrets
     token = secrets.token_hex(16)
     TOKENS[token] = user_id
-
-    # Mettre à jour l'utilisateur courant pour les autres endpoints
-    CURRENT_USER_ID = user_id
+    print(f"LOGIN DEBUG: User logged in. Email={body.email} -> ID={user_id}. Token={token[:6]}...")
 
     return {"token": token, "user_id": user_id}
 
@@ -236,7 +265,7 @@ def confirm(body: ConfirmBody):
 
 
 @app.get("/me/profile", response_model=UserProfile)
-def get_my_profile():
+def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
     """Récupère les infos du profil de l'utilisateur courant + stats."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -244,7 +273,7 @@ def get_my_profile():
         # Infos user
         cur.execute(
             "SELECT id_utilisateur, nom_utilisateur, email FROM Utilisateur WHERE id_utilisateur = %s",
-            (CURRENT_USER_ID,)
+            (current_user_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -252,17 +281,17 @@ def get_my_profile():
             raise HTTPException(status_code=404, detail="Utilisateur introuvable")
         
         # Stats
-        cur.execute("SELECT COUNT(*) FROM Collection WHERE utilisateur_id = %s", (CURRENT_USER_ID,))
+        cur.execute("SELECT COUNT(*) FROM Collection WHERE utilisateur_id = %s", (current_user_id,))
         nb_col = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM Souhait WHERE utilisateur_id = %s", (CURRENT_USER_ID,))
+        cur.execute("SELECT COUNT(*) FROM Souhait WHERE utilisateur_id = %s", (current_user_id,))
         nb_wish = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*) FROM Amitie 
             WHERE (utilisateur_1_id = %s OR utilisateur_2_id = %s) 
               AND statut = 'accepte'
-        """, (CURRENT_USER_ID, CURRENT_USER_ID))
+        """, (current_user_id, current_user_id))
         nb_amis = cur.fetchone()[0]
 
     except Exception as e:
@@ -376,10 +405,10 @@ def search_livres(
 # Collection utilisateur (stockée en base, table Collection)
 # --------------------------------------------------------------------
 @app.get("/me/collection", response_model=List[Book])
-def get_collection():
+def get_collection(current_user_id: int = Depends(get_current_user_id)):
     """
     Renvoie les livres de la collection de l'utilisateur courant
-    (CURRENT_USER_ID) en joignant Collection -> Livre.
+    (current_user_id) en joignant Collection -> Livre.
     """
     conn = get_db_connection()
     cur = conn.cursor()
@@ -394,7 +423,48 @@ def get_collection():
     """
 
     try:
-        cur.execute(sql, (CURRENT_USER_ID,))
+        cur.execute(sql, (current_user_id,))
+        rows = cur.fetchall()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+
+    conn.close()
+
+    return [
+        Book(
+            isbn=row[0],
+            titre=row[1],
+            auteur=row[2] or "",
+            categorie=row[3],
+            image_petite=row[4],
+            resume=row[5],
+            editeur=row[6],
+            langue=row[7],
+        )
+        for row in rows
+    ]
+
+
+@app.get("/users/{user_id}/collection", response_model=List[Book])
+def get_user_collection(user_id: int):
+    """
+    Renvoie les livres de la collection d'un autre utilisateur.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    sql = """
+        SELECT l.isbn, l.titre, l.auteur, cat.nomcat, l.image_petite, l.resume, l.editeur, l.langue
+        FROM Collection col
+        JOIN Livre l ON l.isbn = col.livre_isbn
+        LEFT JOIN Categorie cat ON cat.id = l.categorie_id
+        WHERE col.utilisateur_id = %s
+        ORDER BY col.date_ajout DESC
+    """
+
+    try:
+        cur.execute(sql, (user_id,))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
@@ -418,7 +488,7 @@ def get_collection():
 
 
 @app.post("/me/collection")
-def add_collection(item: AddItem):
+def add_collection(item: AddItem, current_user_id: int = Depends(get_current_user_id)):
     """
     Ajoute un livre à la collection de l'utilisateur courant, si :
       - le livre existe dans Livre
@@ -441,7 +511,7 @@ def add_collection(item: AddItem):
             FROM Collection
             WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (CURRENT_USER_ID, item.isbn),
+            (current_user_id, item.isbn),
         )
         if cur.fetchone() is not None:
             conn.close()
@@ -454,7 +524,7 @@ def add_collection(item: AddItem):
             INSERT INTO Collection (utilisateur_id, livre_isbn)
             VALUES (%s, %s)
             """,
-            (CURRENT_USER_ID, item.isbn),
+            (current_user_id, item.isbn),
         )
         conn.commit()
     except Exception as e:
@@ -468,6 +538,7 @@ def add_collection(item: AddItem):
 @app.delete("/me/collection")
 def remove_collection(
     isbn: str = Query(..., description="ISBN à retirer de la collection"),
+    current_user_id: int = Depends(get_current_user_id)
 ):
     """
     Retire un livre de la collection de l'utilisateur courant.
@@ -481,7 +552,7 @@ def remove_collection(
             DELETE FROM Collection
             WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (CURRENT_USER_ID, isbn),
+            (current_user_id, isbn),
         )
         conn.commit()
         deleted = cur.rowcount
@@ -503,7 +574,7 @@ def remove_collection(
 # WISHLIST utilisateur (table Souhait)
 # --------------------------------------------------------------------
 @app.get("/me/wishlist", response_model=List[Book])
-def get_wishlist():
+def get_wishlist(current_user_id: int = Depends(get_current_user_id)):
     """
     Renvoie les livres présents dans la wishlist de l'utilisateur courant
     en lisant la table Souhait + jointure avec Livre.
@@ -521,7 +592,7 @@ def get_wishlist():
             WHERE s.utilisateur_id = %s
             ORDER BY s.date_ajout DESC
             """,
-            (CURRENT_USER_ID,),
+            (current_user_id,),
         )
         rows = cur.fetchall()
     except Exception as e:
@@ -546,7 +617,7 @@ def get_wishlist():
 
 
 @app.post("/me/wishlist")
-def add_wishlist(item: AddItem):
+def add_wishlist(item: AddItem, current_user_id: int = Depends(get_current_user_id)):
     """
     Ajoute un livre à la wishlist de l'utilisateur courant
     dans la table Souhait.
@@ -568,7 +639,7 @@ def add_wishlist(item: AddItem):
             SELECT 1 FROM Souhait
             WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (CURRENT_USER_ID, item.isbn),
+            (current_user_id, item.isbn),
         )
         already = cur.fetchone()
         if already:
@@ -581,7 +652,7 @@ def add_wishlist(item: AddItem):
             INSERT INTO Souhait (utilisateur_id, livre_isbn)
             VALUES (%s, %s)
             """,
-            (CURRENT_USER_ID, item.isbn),
+            (current_user_id, item.isbn),
         )
         conn.commit()
     except Exception as e:
@@ -596,6 +667,7 @@ def add_wishlist(item: AddItem):
 @app.delete("/me/wishlist")
 def remove_wishlist(
     isbn: str = Query(..., description="ISBN à retirer de la wishlist"),
+    current_user_id: int = Depends(get_current_user_id)
 ):
     """
     Retire un livre de la wishlist de l'utilisateur courant
@@ -610,7 +682,7 @@ def remove_wishlist(
             DELETE FROM Souhait
             WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (CURRENT_USER_ID, isbn),
+            (current_user_id, isbn),
         )
         if cur.rowcount == 0:
             conn.close()
@@ -662,7 +734,7 @@ CANDIDATE_FRIENDS: list[Friend] = [
 
 
 @app.get("/friends", response_model=List[Friend])
-def get_friends():
+def get_friends(current_user_id: int = Depends(get_current_user_id)):
     """Récupère la liste des amis confirmés de l'utilisateur courant."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -676,7 +748,7 @@ def get_friends():
             )
             WHERE a.statut = 'accepte'
         """
-        cur.execute(sql, (CURRENT_USER_ID, CURRENT_USER_ID))
+        cur.execute(sql, (current_user_id, current_user_id))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
@@ -686,7 +758,7 @@ def get_friends():
 
 
 @app.get("/friends/requests", response_model=List[Friend])
-def get_friend_requests_incoming():
+def get_friend_requests_incoming(current_user_id: int = Depends(get_current_user_id)):
     """Demandes d'amis reçues (en attente)."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -697,7 +769,7 @@ def get_friend_requests_incoming():
             JOIN Utilisateur u ON a.utilisateur_1_id = u.id_utilisateur
             WHERE a.utilisateur_2_id = %s AND a.statut = 'en_attente'
         """
-        cur.execute(sql, (CURRENT_USER_ID,))
+        cur.execute(sql, (current_user_id,))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
@@ -707,13 +779,13 @@ def get_friend_requests_incoming():
 
 
 @app.get("/friends/requests/incoming", response_model=List[Friend])
-def get_friend_requests_incoming_alias():
+def get_friend_requests_incoming_alias(current_user_id: int = Depends(get_current_user_id)):
     """Alias pour les demandes reçues."""
-    return get_friend_requests_incoming()
+    return get_friend_requests_incoming(current_user_id)
 
 
 @app.get("/friends/requests-outgoing", response_model=List[Friend])
-def get_friend_requests_outgoing():
+def get_friend_requests_outgoing(current_user_id: int = Depends(get_current_user_id)):
     """Demandes d'amis envoyées (en attente)."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -724,7 +796,7 @@ def get_friend_requests_outgoing():
             JOIN Utilisateur u ON a.utilisateur_2_id = u.id_utilisateur
             WHERE a.utilisateur_1_id = %s AND a.statut = 'en_attente'
         """
-        cur.execute(sql, (CURRENT_USER_ID,))
+        cur.execute(sql, (current_user_id,))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
@@ -734,7 +806,7 @@ def get_friend_requests_outgoing():
 
 
 @app.delete("/friends/{friend_id}")
-def remove_friend(friend_id: int):
+def remove_friend(friend_id: int, current_user_id: int = Depends(get_current_user_id)):
     """Supprimer un ami."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -744,7 +816,7 @@ def remove_friend(friend_id: int):
             WHERE (utilisateur_1_id = %s AND utilisateur_2_id = %s)
                OR (utilisateur_1_id = %s AND utilisateur_2_id = %s)
         """
-        cur.execute(sql, (CURRENT_USER_ID, friend_id, friend_id, CURRENT_USER_ID))
+        cur.execute(sql, (current_user_id, friend_id, friend_id, current_user_id))
         conn.commit()
         if cur.rowcount == 0:
             conn.close()
@@ -759,7 +831,7 @@ def remove_friend(friend_id: int):
 
 
 @app.post("/friends/requests/{friend_id}/accept")
-def accept_friend_request(friend_id: int):
+def accept_friend_request(friend_id: int, current_user_id: int = Depends(get_current_user_id)):
     """Accepter une demande d'ami reçue."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -769,7 +841,7 @@ def accept_friend_request(friend_id: int):
             SET statut = 'accepte'
             WHERE utilisateur_1_id = %s AND utilisateur_2_id = %s AND statut = 'en_attente'
         """
-        cur.execute(sql, (friend_id, CURRENT_USER_ID))
+        cur.execute(sql, (friend_id, current_user_id))
         conn.commit()
         if cur.rowcount == 0:
             conn.close()
@@ -784,7 +856,7 @@ def accept_friend_request(friend_id: int):
 
 
 @app.post("/friends/requests/{friend_id}/refuse")
-def refuse_friend_request(friend_id: int):
+def refuse_friend_request(friend_id: int, current_user_id: int = Depends(get_current_user_id)):
     """Refuser une demande d'ami reçue."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -793,7 +865,7 @@ def refuse_friend_request(friend_id: int):
             DELETE FROM Amitie 
             WHERE utilisateur_1_id = %s AND utilisateur_2_id = %s AND statut = 'en_attente'
         """
-        cur.execute(sql, (friend_id, CURRENT_USER_ID))
+        cur.execute(sql, (friend_id, current_user_id))
         conn.commit()
         if cur.rowcount == 0:
             conn.close()
@@ -810,6 +882,7 @@ def refuse_friend_request(friend_id: int):
 @app.get("/friends/search", response_model=List[Friend])
 def search_friends(
     q: str = Query(..., description="Nom / pseudo de la personne à rechercher"),
+    current_user_id: int = Depends(get_current_user_id)
 ):
     """Recherche d'utilisateurs (exclut les amis et demandes en cours)."""
     q_lower = q.lower().strip()
@@ -834,7 +907,7 @@ def search_friends(
               )
             LIMIT 20
         """
-        cur.execute(sql, (CURRENT_USER_ID, f"%{q_lower}%", CURRENT_USER_ID, CURRENT_USER_ID, CURRENT_USER_ID))
+        cur.execute(sql, (current_user_id, f"%{q_lower}%", current_user_id, current_user_id, current_user_id))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
@@ -844,7 +917,7 @@ def search_friends(
 
 
 @app.post("/friends/requests/{friend_id}")
-def send_friend_request(friend_id: int):
+def send_friend_request(friend_id: int, current_user_id: int = Depends(get_current_user_id)):
     """Envoyer une demande d'ami."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -856,7 +929,7 @@ def send_friend_request(friend_id: int):
             raise HTTPException(status_code=404, detail="Utilisateur inconnu")
         
         # Ne pas s'ajouter soi-même
-        if friend_id == CURRENT_USER_ID:
+        if friend_id == current_user_id:
             conn.close()
             raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous ajouter vous-même")
         
@@ -865,7 +938,7 @@ def send_friend_request(friend_id: int):
             SELECT 1 FROM Amitie 
             WHERE (utilisateur_1_id = %s AND utilisateur_2_id = %s)
                OR (utilisateur_1_id = %s AND utilisateur_2_id = %s)
-        """, (CURRENT_USER_ID, friend_id, friend_id, CURRENT_USER_ID))
+        """, (current_user_id, friend_id, friend_id, current_user_id))
         if cur.fetchone():
             conn.close()
             raise HTTPException(status_code=400, detail="Demande déjà existante ou déjà amis")
@@ -874,7 +947,7 @@ def send_friend_request(friend_id: int):
         cur.execute("""
             INSERT INTO Amitie (utilisateur_1_id, utilisateur_2_id, statut)
             VALUES (%s, %s, 'en_attente')
-        """, (CURRENT_USER_ID, friend_id))
+        """, (current_user_id, friend_id))
         conn.commit()
     except HTTPException:
         raise
@@ -900,14 +973,13 @@ EXCHANGE_ALLOWED_STATUS = {
 
 
 @app.post("/exchanges", response_model=ExchangeOut)
-def create_exchange(body: ExchangeCreate):
+def create_exchange(body: ExchangeCreate, current_user_id: int = Depends(get_current_user_id)):
     """
-    Crée une nouvelle demande d'échange :
-      - CURRENT_USER_ID = demandeur
-      - destinataire_id = ami
-      - deux ISBN (un pour moi, un pour lui)
+    Crée une nouvelle demande d'échange.
+    NOTE: La BDD ne stocke PAS le destinataire_id dans la table Echange.
+    C'est donc un échange "ouvert" sur le livre destinataire.
     """
-    if body.destinataire_id == CURRENT_USER_ID:
+    if body.destinataire_id == current_user_id:
         raise HTTPException(
             status_code=400,
             detail="On ne peut pas créer un échange avec soi-même.",
@@ -917,15 +989,6 @@ def create_exchange(body: ExchangeCreate):
     cur = conn.cursor()
 
     try:
-        # Vérifier que le destinataire existe
-        cur.execute(
-            "SELECT 1 FROM Utilisateur WHERE id_utilisateur = %s",
-            (body.destinataire_id,),
-        )
-        if not cur.fetchone():
-            conn.close()
-            raise HTTPException(status_code=404, detail="Destinataire introuvable")
-
         # Vérifier que les deux livres existent
         cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (body.livre_demandeur_isbn,))
         if not cur.fetchone():
@@ -946,45 +1009,44 @@ def create_exchange(body: ExchangeCreate):
                 detail="Livre du destinataire introuvable",
             )
 
-        # Insertion de l'échange
+        # Insertion de l'échange (SANS destinataire_id, car colonne inexistante)
         cur.execute(
             """
             INSERT INTO Echange (
-                demandeur_id,
-                destinataire_id,
+                expediteur_id,
                 livre_demandeur_isbn,
                 livre_destinataire_isbn,
                 statut,
-                date_creation,
-                date_derniere_maj
+                date_echange
             )
-            VALUES (%s, %s, %s, %s, 'demande_envoyee', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES (%s, %s, %s, 'demande_envoyee', CURRENT_TIMESTAMP)
             """,
             (
-                CURRENT_USER_ID,
-                body.destinataire_id,
+                current_user_id,
                 body.livre_demandeur_isbn,
                 body.livre_destinataire_isbn,
             ),
         )
-        echange_id = cur.lastrowid
+        id_demande = cur.lastrowid
 
         # Récupérer la ligne pour la renvoyer
         cur.execute(
             """
             SELECT
-                id_echange,
-                demandeur_id,
-                destinataire_id,
-                livre_demandeur_isbn,
-                livre_destinataire_isbn,
-                statut,
-                date_creation,
-                date_derniere_maj
-            FROM Echange
-            WHERE id_echange = %s
+                e.id_demande,
+                e.expediteur_id,
+                e.livre_demandeur_isbn,
+                l1.titre,
+                e.livre_destinataire_isbn,
+                l2.titre,
+                e.statut,
+                e.date_echange
+            FROM Echange e
+            LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
+            LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
+            WHERE e.id_demande = %s
             """,
-            (echange_id,),
+            (id_demande,),
         )
         row = cur.fetchone()
         conn.commit()
@@ -1005,47 +1067,42 @@ def list_my_exchanges(
     ),
     statut: Optional[str] = Query(
         default=None,
-        description="Filtre sur le statut (demande_envoyee, demande_acceptee, ...)",
+        description="Filtre sur le statut",
     ),
+    current_user_id: int = Depends(get_current_user_id)
 ):
     """
-    Liste les échanges où l'utilisateur courant est demandeur ou destinataire.
+    Liste les échanges.
+    - Demandeur = expediteur_id est MOI
+    - Destinataire = livre_destinataire_isbn est DANS MA COLLECTION
     """
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # On récupère TOUS les échanges qui me concernent
+    # Soit je l'ai envoyé (expediteur_id = ME)
+    # Soit je "possède" le livre demandé (livre_destinataire_isbn IN MyCollection)
     sql = """
         SELECT
-            id_echange,
-            demandeur_id,
-            destinataire_id,
-            livre_demandeur_isbn,
-            livre_destinataire_isbn,
-            statut,
-            date_creation,
-            date_derniere_maj
-        FROM Echange
-        WHERE 1=1
+            e.id_demande,
+            e.expediteur_id,
+            e.livre_demandeur_isbn,
+            l1.titre as titre_demandeur,
+            e.livre_destinataire_isbn,
+            l2.titre as titre_destinataire,
+            e.statut,
+            e.date_echange
+        FROM Echange e
+        LEFT JOIN Collection c ON e.livre_destinataire_isbn = c.livre_isbn AND c.utilisateur_id = %s
+        LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
+        LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
+        WHERE e.expediteur_id = %s OR c.utilisateur_id IS NOT NULL
     """
-    params: list = []
+    params = [current_user_id, current_user_id]
 
-    if role == "demandeur":
-        sql += " AND demandeur_id = %s"
-        params.append(CURRENT_USER_ID)
-    elif role == "destinataire":
-        sql += " AND destinataire_id = %s"
-        params.append(CURRENT_USER_ID)
-    else:
-        # tous les échanges où je suis impliqué
-        sql += " AND (demandeur_id = %s OR destinataire_id = %s)"
-        params.extend([CURRENT_USER_ID, CURRENT_USER_ID])
-
-    if statut:
-        if statut not in EXCHANGE_ALLOWED_STATUS:
-            raise HTTPException(status_code=400, detail="Statut invalide")
-        sql += " AND statut = %s"
-        params.append(statut)
-
+    # Note: le filtrage par role/statut est plus complexe en SQL direct ici
+    # on va filtrer en Python pour simplifier la logique "destinataire dynamique"
+    
     try:
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -1054,23 +1111,44 @@ def list_my_exchanges(
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
 
     conn.close()
-    return [row_to_exchange(r) for r in rows]
+
+    results = []
+    for row in rows:
+        exc = row_to_exchange(row)
+        
+        # Determine my role
+        is_sender = (exc.expediteur_id == current_user_id)
+        # Recipient logic handled by the query (if I wasn't sender, I must be recipient)
+        
+        if role == "demandeur" and not is_sender:
+            continue
+        if role == "destinataire" and is_sender:
+            continue
+            
+        if statut and exc.statut != statut:
+            continue
+            
+        results.append(exc)
+
+    return results
 
 
 def _get_exchange_for_update(cur, exchange_id: int):
     cur.execute(
         """
         SELECT
-            id_echange,
-            demandeur_id,
-            destinataire_id,
-            livre_demandeur_isbn,
-            livre_destinataire_isbn,
-            statut,
-            date_creation,
-            date_derniere_maj
-        FROM Echange
-        WHERE id_echange = %s
+            e.id_demande,
+            e.expediteur_id,
+            e.livre_demandeur_isbn,
+            l1.titre,
+            e.livre_destinataire_isbn,
+            l2.titre,
+            e.statut,
+            e.date_echange
+        FROM Echange e
+        LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
+        LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
+        WHERE e.id_demande = %s
         """,
         (exchange_id,),
     )
@@ -1081,56 +1159,74 @@ def _get_exchange_for_update(cur, exchange_id: int):
 
 
 @app.post("/exchanges/{exchange_id}/accept", response_model=ExchangeOut)
-def accept_exchange(exchange_id: int):
+def accept_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
     """
-    Le destinataire accepte la demande d'échange.
+    Accepte l'échange. Vérifie que je possède le livre demandé.
     """
     conn = get_db_connection()
     cur = conn.cursor()
 
     try:
         row = _get_exchange_for_update(cur, exchange_id)
-        echange = row_to_exchange(row)
+        # row: id, expediteur, livre_dem, titre_dem, livre_dest, titre_dest, statut, date
+        livre_dest_isbn = row[4]
+        statut = row[6]
 
-        if echange.destinataire_id != CURRENT_USER_ID:
+        # Vérifier que JE possède le livre destinataire
+        cur.execute(
+            "SELECT 1 FROM Collection WHERE utilisateur_id = %s AND livre_isbn = %s",
+            (current_user_id, livre_dest_isbn)
+        )
+        if not cur.fetchone():
             raise HTTPException(
                 status_code=403,
-                detail="Seul le destinataire peut accepter l'échange.",
+                detail="Vous ne possédez pas le livre demandé, impossible d'accepter.",
             )
 
-        if echange.statut != "demande_envoyee":
+        if statut != "demande_envoyee":
             raise HTTPException(
                 status_code=400,
-                detail="Seules les demandes en attente peuvent être acceptées.",
+                detail="Statut invalide pour acceptation.",
             )
 
         cur.execute(
             """
             UPDATE Echange
-            SET statut = 'demande_acceptee',
-                date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            SET statut = 'proposition_confirmee'
+            WHERE id_demande = %s
             """,
             (exchange_id,),
         )
+        
+        # --- ECHANGE DES LIVRES DANS LA COLLECTION ---
+        expediteur_id = row[1]
+        livre_demandeur_isbn = row[2]
+        # livre_dest_isbn = row[4] (déjà récupéré au dessus)
 
+        # 1. Le livre de l'expéditeur (demandeur) devient le mien (destinataire)
+        # On vérifie d'abord que l'expéditeur l'a bien toujours (sécurité)
         cur.execute(
             """
-            SELECT
-                id_echange,
-                demandeur_id,
-                destinataire_id,
-                livre_demandeur_isbn,
-                livre_destinataire_isbn,
-                statut,
-                date_creation,
-                date_derniere_maj
-            FROM Echange
-            WHERE id_echange = %s
+            UPDATE Collection
+            SET utilisateur_id = %s
+            WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (exchange_id,),
+            (current_user_id, expediteur_id, livre_demandeur_isbn)
         )
-        updated = cur.fetchone()
+        
+        # 2. Mon livre (destinataire) devient celui de l'expéditeur
+        cur.execute(
+            """
+            UPDATE Collection
+            SET utilisateur_id = %s
+            WHERE utilisateur_id = %s AND livre_isbn = %s
+            """,
+            (expediteur_id, current_user_id, livre_dest_isbn)
+        )
+        # ---------------------------------------------
+        
+        # Re-fetch for return
+        row = _get_exchange_for_update(cur, exchange_id)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -1138,60 +1234,35 @@ def accept_exchange(exchange_id: int):
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
 
     conn.close()
-    return row_to_exchange(updated)
+    return row_to_exchange(row)
 
 
 @app.post("/exchanges/{exchange_id}/refuse", response_model=ExchangeOut)
-def refuse_exchange(exchange_id: int):
-    """
-    Le destinataire refuse la demande d'échange.
-    """
+def refuse_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
     conn = get_db_connection()
     cur = conn.cursor()
 
     try:
         row = _get_exchange_for_update(cur, exchange_id)
-        echange = row_to_exchange(row)
-
-        if echange.destinataire_id != CURRENT_USER_ID:
-            raise HTTPException(
-                status_code=403,
-                detail="Seul le destinataire peut refuser l'échange.",
-            )
-
-        if echange.statut != "demande_envoyee":
-            raise HTTPException(
-                status_code=400,
-                detail="Seules les demandes en attente peuvent être refusées.",
-            )
+        livre_dest_isbn = row[4]
+        
+        # Vérifier que JE possède le livre (donc je suis légitime pour refuser)
+        cur.execute(
+            "SELECT 1 FROM Collection WHERE utilisateur_id = %s AND livre_isbn = %s",
+            (current_user_id, livre_dest_isbn)
+        )
+        if not cur.fetchone():
+             raise HTTPException(status_code=403, detail="Non autorisé")
 
         cur.execute(
             """
             UPDATE Echange
-            SET statut = 'demande_refusee',
-                date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            SET statut = 'annulee'
+            WHERE id_demande = %s
             """,
             (exchange_id,),
         )
-
-        cur.execute(
-            """
-            SELECT
-                id_echange,
-                demandeur_id,
-                destinataire_id,
-                livre_demandeur_isbn,
-                livre_destinataire_isbn,
-                statut,
-                date_creation,
-                date_derniere_maj
-            FROM Echange
-            WHERE id_echange = %s
-            """,
-            (exchange_id,),
-        )
-        updated = cur.fetchone()
+        row = _get_exchange_for_update(cur, exchange_id)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -1199,60 +1270,33 @@ def refuse_exchange(exchange_id: int):
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
 
     conn.close()
-    return row_to_exchange(updated)
+    return row_to_exchange(row)
 
 
 @app.post("/exchanges/{exchange_id}/cancel", response_model=ExchangeOut)
-def cancel_exchange(exchange_id: int):
-    """
-    Le demandeur annule sa demande d'échange (tant qu'elle est en attente).
-    """
+def cancel_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
     conn = get_db_connection()
     cur = conn.cursor()
 
     try:
         row = _get_exchange_for_update(cur, exchange_id)
-        echange = row_to_exchange(row)
+        expediteur_id = row[1]
 
-        if echange.demandeur_id != CURRENT_USER_ID:
+        if expediteur_id != current_user_id:
             raise HTTPException(
                 status_code=403,
-                detail="Seul le demandeur peut annuler l'échange.",
-            )
-
-        if echange.statut not in ("demande_envoyee", "demande_acceptee"):
-            raise HTTPException(
-                status_code=400,
-                detail="Cet échange ne peut plus être annulé.",
+                detail="Seul le demandeur peut annuler.",
             )
 
         cur.execute(
             """
             UPDATE Echange
-            SET statut = 'annule',
-                date_derniere_maj = CURRENT_TIMESTAMP
-            WHERE id_echange = %s
+            SET statut = 'annulee'
+            WHERE id_demande = %s
             """,
             (exchange_id,),
         )
-
-        cur.execute(
-            """
-            SELECT
-                id_echange,
-                demandeur_id,
-                destinataire_id,
-                livre_demandeur_isbn,
-                livre_destinataire_isbn,
-                statut,
-                date_creation,
-                date_derniere_maj
-            FROM Echange
-            WHERE id_echange = %s
-            """,
-            (exchange_id,),
-        )
-        updated = cur.fetchone()
+        row = _get_exchange_for_update(cur, exchange_id)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -1260,18 +1304,17 @@ def cancel_exchange(exchange_id: int):
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
 
     conn.close()
-    return row_to_exchange(updated)
+    return row_to_exchange(row)
 
 
 # --------------------------------------------------------------------
 # Évaluations (notes / avis) utilisateur (proto : user_id=1)
 # --------------------------------------------------------------------
-# On utilisera l'utilisateur 1 pour le moment
-CURRENT_USER_ID = 1
+
 
 
 @app.post("/me/ratings", response_model=RatingOut)
-def add_or_update_rating(body: RatingBody):
+def add_or_update_rating(body: RatingBody, current_user_id: int = Depends(get_current_user_id)):
     """
     Ajoute ou met à jour la note/avis de l'utilisateur courant
     pour un livre donné.
@@ -1301,7 +1344,7 @@ def add_or_update_rating(body: RatingBody):
             FROM Evaluation
             WHERE utilisateur_id = %s AND livre_isbn = %s
             """,
-            (CURRENT_USER_ID, body.isbn),
+            (current_user_id, body.isbn),
         )
         existing = cur.fetchone()
 
@@ -1313,7 +1356,7 @@ def add_or_update_rating(body: RatingBody):
                 SET note = %s, avis = %s
                 WHERE utilisateur_id = %s AND livre_isbn = %s
                 """,
-                (body.note, body.avis, CURRENT_USER_ID, body.isbn),
+                (body.note, body.avis, current_user_id, body.isbn),
             )
         else:
             # Insertion
@@ -1322,7 +1365,7 @@ def add_or_update_rating(body: RatingBody):
                 INSERT INTO Evaluation (utilisateur_id, livre_isbn, note, avis)
                 VALUES (%s, %s, %s, %s)
                 """,
-                (CURRENT_USER_ID, body.isbn, body.note, body.avis),
+                (current_user_id, body.isbn, body.note, body.avis),
             )
 
         conn.commit()
@@ -1335,7 +1378,7 @@ def add_or_update_rating(body: RatingBody):
 
 
 @app.get("/me/ratings", response_model=List[RatingOut])
-def get_my_ratings(isbn: Optional[str] = Query(default=None)):
+def get_my_ratings(isbn: Optional[str] = Query(default=None), current_user_id: int = Depends(get_current_user_id)):
     """
     Récupère les évaluations de l'utilisateur courant.
     - Si isbn est fourni : renvoie au plus 1 élément (la note pour ce livre).
@@ -1352,7 +1395,7 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None)):
                 FROM Evaluation
                 WHERE utilisateur_id = %s AND livre_isbn = %s
                 """,
-                (CURRENT_USER_ID, isbn),
+                (current_user_id, isbn),
             )
         else:
             cur.execute(
@@ -1361,7 +1404,7 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None)):
                 FROM Evaluation
                 WHERE utilisateur_id = %s
                 """,
-                (CURRENT_USER_ID,),
+                (current_user_id,),
             )
 
         rows = cur.fetchall()

@@ -8,7 +8,7 @@ import '../../wishlist/data/wishlist_repository.dart';
 /// COLLECTION (synchronisée API)
 /// ----------------------------------------------------------------------
 
-final collectionProvider = FutureProvider<List<Book>>((ref) async {
+final collectionProvider = FutureProvider.autoDispose<List<Book>>((ref) async {
   final repo = ref.read(booksRepositoryProvider);
   return repo.getCollection();
 });
@@ -21,7 +21,7 @@ class WishlistNotifier extends StateNotifier<List<Book>> {
   final WishlistRepository _repo;
 
   WishlistNotifier(this._repo) : super([]) {
-    _loadInitial(); // ✔ load initial CORRECTEMENT dans le constructeur
+    _loadInitial();
   }
 
   /// Chargement initial depuis l’API
@@ -30,7 +30,7 @@ class WishlistNotifier extends StateNotifier<List<Book>> {
       final books = await _repo.getWishlist();
       state = books;
     } catch (e) {
-      // Ici tu peux logger si tu veux
+      // Erreur silencieuse ou log
     }
   }
 
@@ -52,7 +52,7 @@ class WishlistNotifier extends StateNotifier<List<Book>> {
 }
 
 /// Provider global
-final wishlistProvider = StateNotifierProvider<WishlistNotifier, List<Book>>((
+final wishlistProvider = StateNotifierProvider.autoDispose<WishlistNotifier, List<Book>>((
   ref,
 ) {
   final repo = ref.read(wishlistRepositoryProvider);

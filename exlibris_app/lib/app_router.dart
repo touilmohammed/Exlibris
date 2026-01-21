@@ -6,7 +6,11 @@ import 'features/auth/presentation/sign_up_page.dart';
 import 'features/home/presentation/home_page.dart';
 import 'features/profile/presentation/profile_page.dart';
 import 'features/books/presentation/book_details_page.dart';
+import 'features/exchanges/presentation/pick_my_book_page.dart';
+import 'features/exchanges/presentation/pick_their_book_page.dart';
+import 'features/exchanges/presentation/exchanges_page.dart';
 import 'models/book.dart';
+import 'models/friend.dart';
 import 'core/token_storage.dart';
 
 class AppRouter {
@@ -27,6 +31,27 @@ class AppRouter {
           final book = state.extra as Book;
           return BookDetailsPage(book: book);
         },
+      ),
+      GoRoute(
+        path: '/exchange/pick-mine',
+        builder: (context, state) {
+          final friend = state.extra as Friend;
+          return PickMyBookPage(friend: friend);
+        },
+      ),
+      GoRoute(
+        path: '/exchange/pick-theirs',
+        builder: (context, state) {
+          final data = state.extra as Map<String, dynamic>;
+          return PickTheirBookPage(
+            friend: data['friend'] as Friend,
+            myBook: data['myBook'] as Book,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/my-exchanges',
+        builder: (context, state) => const ExchangesPage(),
       ),
     ],
   );

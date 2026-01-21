@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/exchange.dart';
+import '../../../models/book.dart';
 import '../../auth/data/auth_repository.dart'; // pour dioProvider
 
 final exchangesRepositoryProvider = Provider<ExchangesRepository>((ref) {
@@ -43,6 +44,19 @@ class ExchangesRepository {
           .toList();
     }
     throw Exception('Format /me/exchanges invalide: $data');
+  }
+
+  /// Récupérer la collection d'un ami
+  Future<List<Book>> getFriendCollection(int friendId) async {
+    final res = await _dio.get('/users/$friendId/collection');
+    final data = res.data;
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(Book.fromJson)
+          .toList();
+    }
+    throw Exception('Format /users/$friendId/collection invalide: $data');
   }
 
   /// Accepter un échange (en tant que destinataire)

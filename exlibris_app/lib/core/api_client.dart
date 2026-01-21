@@ -17,8 +17,12 @@ Dio buildDio() {
     InterceptorsWrapper(
       onRequest: (options, handler) async {
         final token = await TokenStorage.read();
+        print('DIO DEBUG: Requesting ${options.path}');
         if (token != null) {
+          print('DIO DEBUG: Attaching token ${token.substring(0, 5)}...');
           options.headers['Authorization'] = 'Bearer $token';
+        } else {
+          print('DIO DEBUG: No token found in storage');
         }
         handler.next(options);
       },

@@ -1,36 +1,34 @@
 class Exchange {
   final int id;
-  final int demandeurId;
-  final int destinataireId;
+  final int expediteurId;
   final String livreDemandeurIsbn;
+  final String? livreDemandeurTitre;
   final String livreDestinataireIsbn;
+  final String? livreDestinataireTitre;
   final String statut;
-  final DateTime dateCreation;
-  final DateTime? dateDerniereMaj;
+  final DateTime dateEchange;
 
   Exchange({
     required this.id,
-    required this.demandeurId,
-    required this.destinataireId,
+    required this.expediteurId,
     required this.livreDemandeurIsbn,
+    this.livreDemandeurTitre,
     required this.livreDestinataireIsbn,
+    this.livreDestinataireTitre,
     required this.statut,
-    required this.dateCreation,
-    this.dateDerniereMaj,
+    required this.dateEchange,
   });
 
   factory Exchange.fromJson(Map<String, dynamic> json) {
     return Exchange(
-      id: json['id_echange'] as int,
-      demandeurId: json['demandeur_id'] as int,
-      destinataireId: json['destinataire_id'] as int,
+      id: json['id_demande'] as int,
+      expediteurId: json['expediteur_id'] as int,
       livreDemandeurIsbn: json['livre_demandeur_isbn'] as String,
+      livreDemandeurTitre: json['livre_demandeur_titre'] as String?,
       livreDestinataireIsbn: json['livre_destinataire_isbn'] as String,
+      livreDestinataireTitre: json['livre_destinataire_titre'] as String?,
       statut: json['statut'] as String,
-      dateCreation: DateTime.parse(json['date_creation'] as String),
-      dateDerniereMaj: json['date_derniere_maj'] != null
-          ? DateTime.parse(json['date_derniere_maj'] as String)
-          : null,
+      dateEchange: DateTime.parse(json['date_echange'] as String),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart'; // Add import
 
 import '../../../models/friend.dart';
 import '../../friends/data/friends_repository.dart';
@@ -226,93 +227,8 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
     );
   }
 
-  Future<void> _openExchangeDialog(Friend friend) async {
-    final myIsbnController = TextEditingController();
-    final theirIsbnController = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: AppColors.gradientEnd,
-          title: Text(
-            'Proposer un échange à ${friend.nom}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: myIsbnController,
-                style: const TextStyle(color: Colors.white),
-                decoration: AppDecorations.inputDecoration(
-                  label: 'Ton livre (ISBN)',
-                  prefixIcon: Icons.book,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: theirIsbnController,
-                style: const TextStyle(color: Colors.white),
-                decoration: AppDecorations.inputDecoration(
-                  label: 'Livre de ${friend.nom} (ISBN)',
-                  prefixIcon: Icons.book_outlined,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Annuler', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.gradientEnd,
-              ),
-              onPressed: () async {
-                final myIsbn = myIsbnController.text.trim();
-                final theirIsbn = theirIsbnController.text.trim();
-
-                if (myIsbn.isEmpty || theirIsbn.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Merci de remplir les deux ISBN.')),
-                  );
-                  return;
-                }
-
-                try {
-                  final repo = ref.read(exchangesRepositoryProvider);
-                  await repo.createExchange(
-                    destinataireId: friend.id,
-                    livreDemandeurIsbn: myIsbn,
-                    livreDestinataireIsbn: theirIsbn,
-                  );
-
-                  if (!mounted) return;
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Échange proposé à ${friend.nom} (ton $myIsbn ↔ son $theirIsbn)',
-                      ),
-                    ),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erreur lors de la proposition d\'échange : $e')),
-                  );
-                }
-              },
-              icon: const Icon(Icons.swap_horiz),
-              label: const Text('Proposer'),
-            ),
-          ],
-        );
-      },
-    );
+   void _openExchangeDialog(Friend friend) {
+    context.push('/exchange/pick-mine', extra: friend);
   }
 
   Widget _buildSectionTitle(String title, {int? count}) {

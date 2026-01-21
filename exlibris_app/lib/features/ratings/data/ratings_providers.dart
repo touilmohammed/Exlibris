@@ -4,7 +4,7 @@ import '../../../models/rating.dart';
 import 'ratings_repository.dart';
 
 /// Toutes les notes de l'utilisateur courant
-final myRatingsProvider = FutureProvider<List<Rating>>((ref) async {
+final myRatingsProvider = FutureProvider.autoDispose<List<Rating>>((ref) async {
   final repo = ref.read(ratingsRepositoryProvider);
   return repo.getMyRatings();
 });
