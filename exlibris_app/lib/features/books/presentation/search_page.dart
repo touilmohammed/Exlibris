@@ -38,15 +38,54 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     if (scanned == null || scanned.trim().isEmpty) return;
 
-    final numeric = scanned.replaceAll(RegExp(r'[^0-9]'), '');
+    String numeric = scanned.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (numeric.isEmpty) {
       AppToast.warning(context, 'Code scanné invalide');
       return;
     }
 
+    numeric = numeric.length == 13 ? convertIsbn13To10(numeric) : numeric;
+
     _queryController.text = numeric;
     await _runSearch();
+  }
+
+  String convertIsbn13To10(String isbn13) {
+    // 1. Nettoyage
+    String cleanIsbn = isbn13.replaceAll(RegExp(r'[\s-]'), '');
+
+    // 2. Vérification de faisabilité
+    if (cleanIsbn.length != 13) throw Exception("Longueur invalide");
+    if (!cleanIsbn.startsWith("978")) {
+      throw Exception(
+        "Seuls les ISBN commençant par 978 peuvent être convertis",
+      );
+    }
+
+    // 3. On extrait les 9 chiffres centraux (on enlève '978' et le dernier chiffre)
+    String core = cleanIsbn.substring(3, 12);
+
+    // 4. Calcul de la clé de contrôle Modulo 11
+    // Somme pondérée de 10 à 2
+    int sum = 0;
+    for (int i = 0; i < core.length; i++) {
+      sum += int.parse(core[i]) * (10 - i);
+    }
+
+    int mod = sum % 11;
+    int checkDigitValue = 11 - mod;
+
+    String checkDigit;
+    if (checkDigitValue == 10) {
+      checkDigit = "X";
+    } else if (checkDigitValue == 11) {
+      checkDigit = "0";
+    } else {
+      checkDigit = checkDigitValue.toString();
+    }
+
+    return "$core$checkDigit";
   }
 
   Future<void> _runSearch() async {
