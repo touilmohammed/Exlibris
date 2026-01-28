@@ -1,3 +1,9 @@
 data/
 exlibris.db 
 /.env.local
+__pycache__/
+*.pyc
+.env
+# ML artifacts
+*.pkl
+*.npz

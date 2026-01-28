@@ -5,6 +5,12 @@ from typing import Optional, List
 import pymysql
 import os
 from dotenv import load_dotenv
+import joblib
+from pathlib import Path
+import pandas as pd
+import json
+from scipy.sparse import load_npz
+from sklearn.metrics.pairwise import linear_kernel
 
 # Charger les variables d'environnement depuis .env.local
 load_dotenv('.env.local')
@@ -20,6 +26,16 @@ DB_NAME = os.getenv("DB_NAME", "exlibris")
 
 
 
+ML_PIPELINE = None
+ML_PATH = Path(__file__).parent / "ml" / "reco_pipeline.pkl"
+
+TFIDF_VECT = None
+TFIDF_MATRIX = None
+TFIDF_META = None
+
+TFIDF_VECT_PATH = Path(__file__).parent / "ml" / "tfidf_vectorizer.pkl"
+TFIDF_MATRIX_PATH = Path(__file__).parent / "ml" / "tfidf_matrix.npz"
+TFIDF_META_PATH = Path(__file__).parent / "ml" / "tfidf_meta.json"
 
 def get_db_connection():
     try:
@@ -45,6 +61,29 @@ app = FastAPI(
     version="1.0.0",
     root_path="/exlibris-api",
 )
+
+@app.on_event("startup")
+def load_ml():
+    global ML_PIPELINE
+    try:
+        ML_PIPELINE = joblib.load(ML_PATH)
+        print("[ML] reco_pipeline chargé.")
+    except Exception as e:
+        ML_PIPELINE = None
+        print(f"[ML] Impossible de charger le modèle: {e}")
+        # --- Charger modèle TF-IDF (content-based) ---
+    global TFIDF_VECT, TFIDF_MATRIX, TFIDF_META
+    try:
+        TFIDF_VECT = joblib.load(TFIDF_VECT_PATH)
+        TFIDF_MATRIX = load_npz(TFIDF_MATRIX_PATH)
+        with open(TFIDF_META_PATH, "r", encoding="utf-8") as f:
+            TFIDF_META = json.load(f)
+        print("[ML] TFIDF modèle livres chargé.")
+    except Exception as e:
+        TFIDF_VECT = None
+        TFIDF_MATRIX = None
+        TFIDF_META = None
+        print(f"[ML] Impossible de charger TFIDF: {e}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -127,6 +166,13 @@ class ExchangeOut(BaseModel):
     statut: str
     date_echange: Optional[str] = None
 
+class SimilarBookOut(BaseModel):
+    isbn: str
+    titre: str
+    auteur: str
+    editeur: Optional[str] = None
+    image: Optional[str] = None
+    similarity: float
 
 def row_to_exchange(row) -> ExchangeOut:
     return ExchangeOut(
@@ -140,6 +186,126 @@ def row_to_exchange(row) -> ExchangeOut:
         date_echange=str(row[7]) if row[7] else None,
     )
 
+class RecommendationOut(BaseModel):
+    isbn: str
+    titre: str
+    auteur: str
+    score: float
+
+
+@app.get("/me/recommendations", response_model=List[RecommendationOut])
+def me_recommendations(limit: int = 10):
+    if ML_PIPELINE is None:
+        raise HTTPException(status_code=503, detail="Modèle IA non disponible")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Profil user (tu as age + pays seulement -> OK)
+        cur.execute("""
+            SELECT COALESCE(age, 0), COALESCE(pays, 'UNK')
+            FROM Utilisateur
+            WHERE id_utilisateur = %s
+        """, (CURRENT_USER_ID,))
+        u = cur.fetchone()
+        if not u:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
+
+        age, pays = int(u[0]), str(u[1] or "UNK")
+
+        # Livres déjà possédés
+        cur.execute("""
+            SELECT livre_isbn FROM Collection WHERE utilisateur_id = %s
+        """, (CURRENT_USER_ID,))
+        owned = {r[0] for r in cur.fetchall()}
+
+        # Candidats: derniers livres (tu peux changer la stratégie)
+        cur.execute("""
+            SELECT
+                l.isbn, l.titre, COALESCE(l.auteur, ''),
+                COALESCE(l.langue, 'UNK'),
+                COALESCE(c.nomcat, 'UNK') AS categorie,
+                COALESCE(YEAR(l.date_publication), 0) AS annee_publication,
+                COALESCE(l.resume, '') AS resume
+            FROM Livre l
+            LEFT JOIN Categorie c ON c.id = l.categorie_id
+            ORDER BY l.date_publication DESC
+            LIMIT 500
+        """)
+        books = cur.fetchall()
+
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+
+    conn.close()
+
+    # Filtrer déjà en collection
+    candidates = [b for b in books if b[0] not in owned]
+    if not candidates:
+        return []
+
+    # Construire DataFrame batch pour le pipeline
+    X = pd.DataFrame([{
+        "age": age,
+        "pays": pays,
+        "langue": b[3],
+        "categorie": b[4],
+        "annee_publication": int(b[5] or 0),
+        "resume": b[6],
+    } for b in candidates])
+
+    proba = ML_PIPELINE.predict_proba(X)[:, 1]
+
+    scored = []
+    for i, b in enumerate(candidates):
+        scored.append((b[0], b[1], b[2], float(proba[i])))
+
+    scored.sort(key=lambda x: x[3], reverse=True)
+    top = scored[:max(1, limit)]
+
+    return [
+        RecommendationOut(isbn=s[0], titre=s[1], auteur=s[2], score=round(s[3], 4))
+        for s in top
+    ]
+
+@app.get("/reco/similar", response_model=List[SimilarBookOut])
+def reco_similar(isbn: str, limit: int = 6):
+    if TFIDF_MATRIX is None or TFIDF_META is None:
+        raise HTTPException(status_code=503, detail="Modèle TF-IDF non disponible")
+
+    # retrouver l'index du livre dans meta
+    idx = None
+    for i, item in enumerate(TFIDF_META):
+        if str(item.get("isbn")) == str(isbn):
+            idx = i
+            break
+
+    if idx is None:
+        raise HTTPException(status_code=404, detail="ISBN introuvable dans l'index TF-IDF")
+
+    sims = linear_kernel(TFIDF_MATRIX[idx], TFIDF_MATRIX).flatten()
+    order = sims.argsort()[::-1]
+
+    results = []
+    for j in order:
+        if j == idx:
+            continue
+        it = TFIDF_META[int(j)]
+        results.append(SimilarBookOut(
+            isbn=it.get("isbn", ""),
+            titre=it.get("titre", ""),
+            auteur=it.get("auteur", ""),
+            editeur=it.get("editeur", None),
+            image=it.get("image", None),
+            similarity=float(sims[int(j)]),
+        ))
+        if len(results) >= max(1, limit):
+            break
+
+    return results
 
 # --------------------------------------------------------------------
 # Stockage des tokens actifs (pour le proto)
@@ -1311,7 +1477,7 @@ def cancel_exchange(exchange_id: int, current_user_id: int = Depends(get_current
 # Évaluations (notes / avis) utilisateur (proto : user_id=1)
 # --------------------------------------------------------------------
 
-
+# On utilisera l'utilisateur 1 pour le moment
 
 @app.post("/me/ratings", response_model=RatingOut)
 def add_or_update_rating(body: RatingBody, current_user_id: int = Depends(get_current_user_id)):
