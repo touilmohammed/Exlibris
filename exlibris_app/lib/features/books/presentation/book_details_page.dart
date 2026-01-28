@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/app_theme.dart';
@@ -53,84 +54,105 @@ class BookDetailsPage extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                       width: 120,
-                       height: 180,
-                       decoration: BoxDecoration(
-                         borderRadius: BorderRadius.circular(12),
-                         color: AppColors.cardBackground,
-                         image: book.imagePetite != null && book.imagePetite!.isNotEmpty
-                             ? DecorationImage(
-                                 image: NetworkImage(book.imagePetite!),
-                                 fit: BoxFit.cover,
-                               )
-                             : null,
-                         boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.5), 
-                              blurRadius: 10, 
-                              offset: const Offset(0, 5)
-                            )
-                         ]
-                       ),
-                       child: (book.imagePetite == null || book.imagePetite!.isEmpty)
-                           ? const Icon(Icons.book, size: 48, color: Colors.white24) 
-                           : null,
-                     ),
-                     const SizedBox(width: 24),
-                     Expanded(
-                       child: Column(
-                         crossAxisAlignment: CrossAxisAlignment.start,
-                         children: [
-                           Text(
-                             book.titre,
-                             style: AppTextStyles.heading2,
-                           ),
-                           const SizedBox(height: 8),
-                           Text(
-                             book.auteur,
-                             style: AppTextStyles.body.copyWith(
-                               fontSize: 18, 
-                               color: AppColors.accent,
-                               fontWeight: FontWeight.w500,
-                             ),
-                           ),
-                           const SizedBox(height: 12),
-                           if (book.categorie != null)
-                             Container(
-                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                               decoration: BoxDecoration(
-                                 color: AppColors.cardBackground,
-                                 borderRadius: BorderRadius.circular(20),
-                                 border: Border.all(color: AppColors.cardBorder),
-                               ),
-                               child: Text(
-                                 book.categorie!,
-                                 style: const TextStyle(color: Colors.white70, fontSize: 12),
-                               ),
-                             ),
+                      width: 120,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.cardBackground,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          )
+                        ],
+                      ),
+                      child: ClipRRect( // Garantit que l'image respecte les bords arrondis
+                        borderRadius: BorderRadius.circular(12),
+                        child: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
+                            ? CachedNetworkImage(
+                                imageUrl: book.imagePetite!,
+                                fit: BoxFit.cover,
+                                // AJOUT DU USER-AGENT POUR AMAZON
+                                httpHeaders: const {
+                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                                },
+                                // On utilise imageBuilder pour appliquer le style seulement si l'image charge
+                                imageBuilder: (context, imageProvider) => Container(
+                                  decoration: BoxDecoration(
+                                    image: DecorationImage(
+                                      image: imageProvider,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                errorWidget: (context, url, error) => const Icon(
+                                  Icons.broken_image,
+                                  color: Colors.white24,
+                                  size: 48,
+                                ),
+                              )
+                            : const Icon(Icons.book, size: 48, color: Colors.white24),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            book.titre,
+                            style: AppTextStyles.heading2,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            book.auteur,
+                            style: AppTextStyles.body.copyWith(
+                              fontSize: 18, 
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (book.categorie != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.cardBackground,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: Text(
+                                book.categorie!,
+                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ),
                             const SizedBox(height: 8),
                             Text(
                               'ISBN: ${book.isbn}',
                               style: AppTextStyles.caption,
                             ),
                             if (book.editeur != null) ...[
-                               const SizedBox(height: 4),
-                               Text(
-                                 'Éditeur: ${book.editeur}',
-                                 style: AppTextStyles.caption,
-                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Éditeur: ${book.editeur}',
+                                style: AppTextStyles.caption,
+                              ),
                             ],
                             if (book.langue != null) ...[
-                               const SizedBox(height: 4),
-                               Text(
-                                 'Langue: ${book.langue}',
-                                 style: AppTextStyles.caption,
-                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Langue: ${book.langue}',
+                                style: AppTextStyles.caption,
+                              ),
                             ],
-                         ],
-                       ),
-                     )
-                  ],
+                          ],
+                        ),
+                      )
+                    ],
                 ),
                 const SizedBox(height: 24),
                 Row(

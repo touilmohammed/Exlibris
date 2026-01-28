@@ -1,4 +1,5 @@
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -271,7 +272,14 @@ class _BookCard extends StatelessWidget {
             color: const Color(0xFF1F2933),
             image: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
                 ? DecorationImage(
-                    image: NetworkImage(book.imagePetite!),
+                    image: CachedNetworkImageProvider(
+                      book.imagePetite!,
+                      // AJOUT DU USER-AGENT POUR AMAZON
+                      headers: {
+                        'User-Agent':
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                      },
+                    ),
                     fit: BoxFit.cover,
                   )
                 : null,
