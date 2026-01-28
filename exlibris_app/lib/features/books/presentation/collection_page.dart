@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -90,7 +91,7 @@ class _CollectionList extends ConsumerWidget {
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.55,
+                childAspectRatio: 0.45,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 16,
               ),
@@ -165,35 +166,58 @@ class _BookGridItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Cover
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.gradientEnd,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-                image: book.imagePetite != null
-                    ? DecorationImage(
-                        image: NetworkImage(book.imagePetite!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: book.imagePetite == null
-                  ? Center(
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.gradientEnd,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: book.imagePetite != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: book.imagePetite!,
+                      httpHeaders: {
+                        'User-Agent':
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                      },
+                      fit: BoxFit.contain,
+                      placeholder: (context, url) => const SizedBox(
+                        height: 180,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => SizedBox(
+                        height: 180,
+                        child: Center(
+                          child: Icon(
+                            Icons.menu_book,
+                            size: 32,
+                            color: Colors.white.withOpacity(0.5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : SizedBox(
+                    height: 180,
+                    child: Center(
                       child: Icon(
                         Icons.menu_book,
                         size: 32,
                         color: Colors.white.withOpacity(0.5),
                       ),
-                    )
-                  : null,
-            ),
+                    ),
+                  ),
           ),
           const SizedBox(height: 8),
           // Title
