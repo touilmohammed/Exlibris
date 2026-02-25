@@ -28,12 +28,38 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   late TextEditingController _nameController;
   late TextEditingController _emailController;
+  late TextEditingController _ageController;
+  String? _selectedSexe;
+  String? _selectedPays;
+
+  final List<String> _sexeOptions = [
+    'Homme',
+    'Femme',
+    'Non binaire',
+    'Non précisé',
+    'Autre',
+  ];
+
+  final List<String> _paysOptions = [
+    'France',
+    'Belgique',
+    'Suisse',
+    'Canada',
+    'Algérie',
+    'Maroc',
+    'Tunisie',
+    'Sénégal',
+    'Côte d\'Ivoire',
+    'Cameroun',
+    'Autre',
+  ];
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _emailController = TextEditingController();
+    _ageController = TextEditingController();
     _loadProfile();
   }
 
@@ -41,6 +67,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -52,6 +79,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           _profile = profile;
           _nameController.text = profile.nomUtilisateur;
           _emailController.text = profile.email;
+          _ageController.text = profile.age?.toString() ?? '';
+
+          // Reverse mapping for sexe
+          if (profile.sexe == 'male') {
+            _selectedSexe = 'Homme';
+          } else if (profile.sexe == 'femelle') {
+            _selectedSexe = 'Femme';
+          } else if (profile.sexe == 'indefini') {
+            _selectedSexe = 'Non précisé'; // Default choice for indefini
+          } else {
+            _selectedSexe = null;
+          }
+
+          _selectedPays = profile.pays;
+
           _loading = false;
         });
       }
@@ -183,6 +225,69 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ),
           ),
           const SizedBox(height: 16),
+          if (_isEditing || (_profile!.age != null))
+            _buildInfoRow(
+              "Âge",
+              TextFormField(
+                controller: _ageController,
+                style: AppTextStyles.body,
+                keyboardType: TextInputType.number,
+                readOnly: !_isEditing,
+                textAlign: TextAlign.end,
+                decoration: InputDecoration(
+                  hintText: "Non renseigné",
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  border: _isEditing
+                      ? const UnderlineInputBorder()
+                      : InputBorder.none,
+                ),
+              ),
+            ),
+          if (_isEditing || (_profile!.sexe != null))
+            _buildInfoRow(
+              "Sexe",
+              _isEditing
+                  ? DropdownButtonFormField<String>(
+                      initialValue: _selectedSexe,
+                      dropdownColor: AppColors.backgroundDark,
+                      style: AppTextStyles.body,
+                      items: _sexeOptions.map((s) {
+                        return DropdownMenuItem(value: s, child: Text(s));
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedSexe = val),
+                      decoration: const InputDecoration(
+                        border: UnderlineInputBorder(),
+                      ),
+                    )
+                  : Text(
+                      _selectedSexe ?? "Non renseigné",
+                      style: AppTextStyles.body,
+                      textAlign: TextAlign.end,
+                    ),
+            ),
+          if (_isEditing || (_profile!.pays != null))
+            _buildInfoRow(
+              "Pays",
+              _isEditing
+                  ? DropdownButtonFormField<String>(
+                      initialValue: _selectedPays,
+                      dropdownColor: AppColors.backgroundDark,
+                      style: AppTextStyles.body,
+                      items: _paysOptions.map((p) {
+                        return DropdownMenuItem(value: p, child: Text(p));
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedPays = val),
+                      decoration: const InputDecoration(
+                        border: UnderlineInputBorder(),
+                      ),
+                    )
+                  : Text(
+                      _selectedPays ?? "Non renseigné",
+                      style: AppTextStyles.body,
+                      textAlign: TextAlign.end,
+                    ),
+            ),
+          const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: _buildEditButton()),
           const SizedBox(height: 48),
           _buildStatsRow(),
@@ -202,6 +307,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               onPressed: () => context.push('/my-exchanges'),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, Widget content) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70)),
+          const SizedBox(width: 32),
+          Expanded(child: content),
         ],
       ),
     );
@@ -264,48 +383,123 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildEditButton() {
-    return ElevatedButton.icon(
-      icon: Icon(_isEditing ? Icons.save : Icons.edit, color: Colors.black),
-      label: Text(
-        _isEditing ? 'Enregistrer' : 'Modifier le profil',
-        style: const TextStyle(color: Colors.black),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accent,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-      ),
-      onPressed: _isSaving
-          ? null
-          : () async {
-              if (_isEditing) {
-                // Sauvegarder
-                setState(() => _isSaving = true);
-                try {
-                  await ref
-                      .read(profileRepositoryProvider)
-                      .updateProfile(
-                        nomUtilisateur: _nameController.text,
-                        email: _emailController.text,
-                      );
-                  // Rafraîchir
-                  await _loadProfile();
-                  if (mounted) {
+    if (!_isEditing) {
+      return ElevatedButton.icon(
+        icon: const Icon(Icons.edit, color: Colors.black),
+        label: const Text(
+          'Modifier le profil',
+          style: TextStyle(color: Colors.black),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        onPressed: () => setState(() => _isEditing = true),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.close, color: Colors.white70),
+            label: const Text(
+              'Annuler',
+              style: TextStyle(color: Colors.white70),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            onPressed: _isSaving
+                ? null
+                : () {
                     setState(() {
                       _isEditing = false;
+                      // Remettre les données de base
+                      if (_profile != null) {
+                        _nameController.text = _profile!.nomUtilisateur;
+                        _emailController.text = _profile!.email;
+                        _ageController.text = _profile!.age?.toString() ?? '';
+
+                        // Reset sexe
+                        if (_profile!.sexe == 'male') {
+                          _selectedSexe = 'Homme';
+                        } else if (_profile!.sexe == 'femelle') {
+                          _selectedSexe = 'Femme';
+                        } else if (_profile!.sexe == 'indefini') {
+                          _selectedSexe = 'Non précisé';
+                        } else {
+                          _selectedSexe = null;
+                        }
+
+                        _selectedPays = _profile!.pays;
+                      }
                     });
-                    AppToast.success(context, "Profil mis à jour");
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    AppToast.error(context, "Erreur lors de la mise à jour");
-                  }
-                } finally {
-                  if (mounted) setState(() => _isSaving = false);
-                }
-              } else {
-                setState(() => _isEditing = true);
-              }
-            },
+                  },
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: ElevatedButton.icon(
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.black,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.check, color: Colors.black),
+            label: const Text(
+              'Sauvegarder',
+              style: TextStyle(color: Colors.black),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+            onPressed: _isSaving
+                ? null
+                : () async {
+                    setState(() => _isSaving = true);
+                    try {
+                      String apiSexe = 'indefini';
+                      if (_selectedSexe == 'Homme') {
+                        apiSexe = 'male';
+                      } else if (_selectedSexe == 'Femme') {
+                        apiSexe = 'femelle';
+                      }
+
+                      await ref
+                          .read(profileRepositoryProvider)
+                          .updateProfile(
+                            nomUtilisateur: _nameController.text,
+                            email: _emailController.text,
+                            age: int.tryParse(_ageController.text),
+                            sexe: apiSexe,
+                            pays: _selectedPays,
+                          );
+                      await _loadProfile();
+                      if (mounted) {
+                        setState(() => _isEditing = false);
+                        AppToast.success(context, "Profil mis à jour");
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        AppToast.error(
+                          context,
+                          "Erreur lors de la mise à jour",
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _isSaving = false);
+                    }
+                  },
+          ),
+        ),
+      ],
     );
   }
 }

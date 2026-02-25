@@ -105,6 +105,9 @@ class UserProfile(BaseModel):
     id: int
     nom_utilisateur: str
     email: str
+    age: Optional[int] = None
+    sexe: Optional[str] = None
+    pays: Optional[str] = None
     avatar_url: Optional[str] = None
     nb_livres_collection: int = 0
     nb_livres_wishlist: int = 0
@@ -446,8 +449,8 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
     try:
         # Infos user
         cur.execute(
-            "SELECT id_utilisateur, nom_utilisateur, email FROM Utilisateur WHERE id_utilisateur = %s",
-            (current_user_id,),
+            "SELECT id_utilisateur, nom_utilisateur, email, age, sexe, pays FROM Utilisateur WHERE id_utilisateur = %s",
+            (current_user_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -485,6 +488,9 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
         id=row[0],
         nom_utilisateur=row[1],
         email=row[2],
+        age=row[3],
+        sexe=row[4],
+        pays=row[5],
         avatar_url=None,
         nb_livres_collection=nb_col,
         nb_livres_wishlist=nb_wish,
