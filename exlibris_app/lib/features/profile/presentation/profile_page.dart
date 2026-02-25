@@ -7,7 +7,6 @@ import '../../auth/data/auth_repository.dart';
 import '../data/profile_repository.dart';
 import '../domain/user_profile.dart';
 
-
 import '../../books/data/books_providers.dart';
 import '../../exchanges/data/exchanges_providers.dart';
 import '../../friends/data/friends_providers.dart';
@@ -23,12 +22,26 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   UserProfile? _profile;
   bool _loading = true;
+  bool _isEditing = false;
+  bool _isSaving = false;
   String? _error;
+
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -37,6 +50,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (mounted) {
         setState(() {
           _profile = profile;
+          _nameController.text = profile.nomUtilisateur;
+          _emailController.text = profile.email;
           _loading = false;
         });
       }
@@ -73,7 +88,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Mon Profil'),
+        title: const Text(
+          'Mon Profil',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -90,16 +108,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         width: double.infinity,
         height: double.infinity,
         decoration: AppDecorations.pageBackground,
-        child: SafeArea(
-          child: _buildContent(),
-        ),
+        child: SafeArea(child: _buildContent()),
       ),
     );
   }
 
   Widget _buildContent() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.accent));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      );
     }
     if (_error != null) {
       return Center(
@@ -108,14 +126,20 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           children: [
             const Icon(Icons.error_outline, color: AppColors.error, size: 48),
             const SizedBox(height: 16),
-            const Text("Impossible de charger le profil", style: TextStyle(color: Colors.white70)),
+            const Text(
+              "Impossible de charger le profil",
+              style: TextStyle(color: Colors.white70),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () {
                 setState(() => _loading = true);
                 _loadProfile();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+              ),
               child: const Text("Réessayer"),
             ),
           ],
@@ -130,15 +154,36 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         children: [
           _buildAvatar(),
           const SizedBox(height: 16),
-          Text(
-            _profile!.nomUtilisateur,
+          TextFormField(
+            controller: _nameController,
             style: AppTextStyles.heading2,
+            readOnly: !_isEditing,
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              hintText: "Nom d'utilisateur",
+              hintStyle: const TextStyle(color: Colors.white24),
+              border: _isEditing
+                  ? const UnderlineInputBorder()
+                  : InputBorder.none,
+            ),
           ),
           const SizedBox(height: 8),
-          Text(
-            _profile!.email,
+          TextFormField(
+            controller: _emailController,
             style: AppTextStyles.body,
+            keyboardType: TextInputType.emailAddress,
+            readOnly: !_isEditing,
+            textAlign: TextAlign.center,
+            decoration: InputDecoration(
+              hintText: "Email",
+              hintStyle: const TextStyle(color: Colors.white24),
+              border: _isEditing
+                  ? const UnderlineInputBorder()
+                  : InputBorder.none,
+            ),
           ),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: _buildEditButton()),
           const SizedBox(height: 48),
           _buildStatsRow(),
           const SizedBox(height: 32),
@@ -146,7 +191,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             width: double.infinity,
             child: OutlinedButton.icon(
               icon: const Icon(Icons.swap_horiz, color: AppColors.accent),
-              label: const Text('Mes propositions', style: TextStyle(color: Colors.white)),
+              label: const Text(
+                'Mes propositions',
+                style: TextStyle(color: Colors.white),
+              ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.accent),
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -169,7 +217,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         border: Border.all(color: AppColors.accent, width: 2),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withOpacity(0.3),
+            color: AppColors.accent.withValues(alpha: 0.3),
             blurRadius: 20,
             spreadRadius: 2,
           ),
@@ -205,13 +253,59 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         Text(
           label.toUpperCase(),
           style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             fontWeight: FontWeight.w600,
             fontSize: 12,
             letterSpacing: 1.0,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEditButton() {
+    return ElevatedButton.icon(
+      icon: Icon(_isEditing ? Icons.save : Icons.edit, color: Colors.black),
+      label: Text(
+        _isEditing ? 'Enregistrer' : 'Modifier le profil',
+        style: const TextStyle(color: Colors.black),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.accent,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      ),
+      onPressed: _isSaving
+          ? null
+          : () async {
+              if (_isEditing) {
+                // Sauvegarder
+                setState(() => _isSaving = true);
+                try {
+                  await ref
+                      .read(profileRepositoryProvider)
+                      .updateProfile(
+                        nomUtilisateur: _nameController.text,
+                        email: _emailController.text,
+                      );
+                  // Rafraîchir
+                  await _loadProfile();
+                  if (mounted) {
+                    setState(() {
+                      _isEditing = false;
+                    });
+                    AppToast.success(context, "Profil mis à jour");
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    AppToast.error(context, "Erreur lors de la mise à jour");
+                  }
+                } finally {
+                  if (mounted) setState(() => _isSaving = false);
+                }
+              } else {
+                setState(() => _isEditing = true);
+              }
+            },
     );
   }
 }
