@@ -159,6 +159,7 @@ class ExchangeCreate(BaseModel):
 class ExchangeOut(BaseModel):
     id_demande: int
     expediteur_id: int
+    destinataire_id: Optional[int] = None
     livre_demandeur_isbn: str
     livre_demandeur_titre: Optional[str] = None
     livre_destinataire_isbn: str
@@ -178,12 +179,13 @@ def row_to_exchange(row) -> ExchangeOut:
     return ExchangeOut(
         id_demande=row[0],
         expediteur_id=row[1],
-        livre_demandeur_isbn=row[2],
-        livre_demandeur_titre=row[3],
-        livre_destinataire_isbn=row[4],
-        livre_destinataire_titre=row[5],
-        statut=row[6],
-        date_echange=str(row[7]) if row[7] else None,
+        destinataire_id=row[2],
+        livre_demandeur_isbn=row[3],
+        livre_demandeur_titre=row[4],
+        livre_destinataire_isbn=row[5],
+        livre_destinataire_titre=row[6],
+        statut=row[7],
+        date_echange=str(row[8]) if row[8] else None,
     )
 
 class RecommendationOut(BaseModel):
@@ -1175,7 +1177,6 @@ def create_exchange(body: ExchangeCreate, current_user_id: int = Depends(get_cur
                 detail="Livre du destinataire introuvable",
             )
 
-        # Insertion de l'échange (SANS destinataire_id, car colonne inexistante)
         cur.execute(
             """
             INSERT INTO Echange (
@@ -1195,12 +1196,14 @@ def create_exchange(body: ExchangeCreate, current_user_id: int = Depends(get_cur
         )
         id_demande = cur.lastrowid
 
-        # Récupérer la ligne pour la renvoyer
+        # Récupérer la ligne pour la renvoyer (mock destinataire_id = body.destinataire_id)
+        # La table n'a pas destinataire_id, on le recupere differemment si besoin.
         cur.execute(
             """
             SELECT
                 e.id_demande,
                 e.expediteur_id,
+                %s as destinataire_id,
                 e.livre_demandeur_isbn,
                 l1.titre,
                 e.livre_destinataire_isbn,
@@ -1212,7 +1215,7 @@ def create_exchange(body: ExchangeCreate, current_user_id: int = Depends(get_cur
             LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
             WHERE e.id_demande = %s
             """,
-            (id_demande,),
+            (body.destinataire_id, id_demande),
         )
         row = cur.fetchone()
         conn.commit()
@@ -1252,6 +1255,7 @@ def list_my_exchanges(
         SELECT
             e.id_demande,
             e.expediteur_id,
+            c.utilisateur_id as destinataire_id,
             e.livre_demandeur_isbn,
             l1.titre as titre_demandeur,
             e.livre_destinataire_isbn,
@@ -1305,6 +1309,7 @@ def _get_exchange_for_update(cur, exchange_id: int):
         SELECT
             e.id_demande,
             e.expediteur_id,
+            0 as destinataire_id,
             e.livre_demandeur_isbn,
             l1.titre,
             e.livre_destinataire_isbn,
@@ -1334,9 +1339,9 @@ def accept_exchange(exchange_id: int, current_user_id: int = Depends(get_current
 
     try:
         row = _get_exchange_for_update(cur, exchange_id)
-        # row: id, expediteur, livre_dem, titre_dem, livre_dest, titre_dest, statut, date
-        livre_dest_isbn = row[4]
-        statut = row[6]
+        # row: id, demandeur_id, destinataire_id, livre_dem, titre_dem, livre_dest, titre_dest, statut, date
+        livre_dest_isbn = row[5]
+        statut = row[7]
 
         # Vérifier que JE possède le livre destinataire
         cur.execute(
@@ -1366,8 +1371,8 @@ def accept_exchange(exchange_id: int, current_user_id: int = Depends(get_current
         
         # --- ECHANGE DES LIVRES DANS LA COLLECTION ---
         expediteur_id = row[1]
-        livre_demandeur_isbn = row[2]
-        # livre_dest_isbn = row[4] (déjà récupéré au dessus)
+        livre_demandeur_isbn = row[3]
+        # livre_dest_isbn = row[5] (déjà récupéré au dessus)
 
         # 1. Le livre de l'expéditeur (demandeur) devient le mien (destinataire)
         # On vérifie d'abord que l'expéditeur l'a bien toujours (sécurité)
@@ -1410,7 +1415,7 @@ def refuse_exchange(exchange_id: int, current_user_id: int = Depends(get_current
 
     try:
         row = _get_exchange_for_update(cur, exchange_id)
-        livre_dest_isbn = row[4]
+        livre_dest_isbn = row[5]
         
         # Vérifier que JE possède le livre (donc je suis légitime pour refuser)
         cur.execute(
@@ -1423,7 +1428,7 @@ def refuse_exchange(exchange_id: int, current_user_id: int = Depends(get_current
         cur.execute(
             """
             UPDATE Echange
-            SET statut = 'annulee'
+            SET statut = 'demande_acceptee_refusee'
             WHERE id_demande = %s
             """,
             (exchange_id,),
