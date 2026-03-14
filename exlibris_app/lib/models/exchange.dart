@@ -1,6 +1,7 @@
 class Exchange {
   final int id;
   final int expediteurId;
+  final int? destinataireId;
   final String livreDemandeurIsbn;
   final String? livreDemandeurTitre;
   final String livreDestinataireIsbn;
@@ -11,6 +12,7 @@ class Exchange {
   Exchange({
     required this.id,
     required this.expediteurId,
+    this.destinataireId,
     required this.livreDemandeurIsbn,
     this.livreDemandeurTitre,
     required this.livreDestinataireIsbn,
@@ -23,6 +25,7 @@ class Exchange {
     return Exchange(
       id: json['id_demande'] as int,
       expediteurId: json['expediteur_id'] as int,
+      destinataireId: json['destinataire_id'] as int?,
       livreDemandeurIsbn: json['livre_demandeur_isbn'] as String,
       livreDemandeurTitre: json['livre_demandeur_titre'] as String?,
       livreDestinataireIsbn: json['livre_destinataire_isbn'] as String,
