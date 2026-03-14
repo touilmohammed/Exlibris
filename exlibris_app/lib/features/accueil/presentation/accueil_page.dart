@@ -12,8 +12,13 @@ import '../../friends/data/friends_providers.dart';
 import '../../../models/friend.dart';
 
 final homeRecommendationsProvider = FutureProvider<List<Book>>((ref) async {
-  final repo = ref.read(booksRepositoryProvider);
-  return repo.searchBooks(query: ""); 
+  try {
+    final repo = ref.read(booksRepositoryProvider);
+    final response = await repo.getRecommendations();
+    return response;
+  } catch (e) {
+    return [];
+  }
 });
 
 /// Page d'accueil principale ExLibris
@@ -21,7 +26,6 @@ final homeRecommendationsProvider = FutureProvider<List<Book>>((ref) async {
 class AccueilPage extends ConsumerWidget {
   const AccueilPage({super.key});
 
-  @override
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final myBooksAsync = ref.watch(collectionProvider);

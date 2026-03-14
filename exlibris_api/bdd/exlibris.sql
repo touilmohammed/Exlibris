@@ -1,377 +1,328 @@
--- phpMyAdmin SQL Dump
--- version 5.2.2
--- https://www.phpmyadmin.net/
---
--- Hôte : mariadb
--- Généré le : mar. 20 jan. 2026 à 14:12
--- Version du serveur : 11.7.2-MariaDB-ubu2404
--- Version de PHP : 8.2.27
+-- =========================================================
+-- Schéma ExLibris - MariaDB 
+-- Contraintes UNIQUE 
+-- =========================================================
 
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
+SET SQL_MODE = "STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION";
 SET time_zone = "+00:00";
+START TRANSACTION;
 
+-- Pour éviter les soucis d'ordre de drop/create
+SET FOREIGN_KEY_CHECKS = 0;
 
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
+DROP TABLE IF EXISTS Echange;
+DROP TABLE IF EXISTS Suggestion;
+DROP TABLE IF EXISTS Diffusion;
+DROP TABLE IF EXISTS Amitie;
+DROP TABLE IF EXISTS Evaluation;
+DROP TABLE IF EXISTS Souhait;
+DROP TABLE IF EXISTS Collection;
+DROP TABLE IF EXISTS Livre;
+DROP TABLE IF EXISTS Categorie;
+DROP TABLE IF EXISTS Utilisateur;
 
---
--- Base de données : `exlibris`
---
+SET FOREIGN_KEY_CHECKS = 1;
 
--- --------------------------------------------------------
+-- ---------------------------------------------------------
+-- TABLE Utilisateur
+-- ---------------------------------------------------------
+CREATE TABLE Utilisateur (
+  id_utilisateur   INT NOT NULL AUTO_INCREMENT,
+  nom_utilisateur  VARCHAR(150) NOT NULL,
+  email            VARCHAR(255) NOT NULL,
+  mot_de_passe     VARCHAR(255) NOT NULL,  
+  age              INT NULL,
+  sexe             ENUM('male','femelle','indefini') NULL DEFAULT 'indefini',
+  pays             VARCHAR(100) NULL,
+  role             ENUM('lecteur','admin') NOT NULL DEFAULT 'lecteur',
 
---
--- Structure de la table `Amitie`
---
+  PRIMARY KEY (id_utilisateur),
+  UNIQUE KEY ux_utilisateur_email (email),
 
-CREATE TABLE `Amitie` (
-  `id_amitie` int(11) NOT NULL,
-  `utilisateur_1_id` int(11) NOT NULL,
-  `utilisateur_2_id` int(11) NOT NULL,
-  `statut` enum('en_attente','accepte') DEFAULT 'en_attente'
+  CHECK (age IS NULL OR age BETWEEN 0 AND 150)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Categorie`
---
+-- ---------------------------------------------------------
+-- TABLE Categorie
+-- ---------------------------------------------------------
+CREATE TABLE Categorie (
+  id     INT NOT NULL AUTO_INCREMENT,
+  nomcat VARCHAR(100) NOT NULL,
 
-CREATE TABLE `Categorie` (
-  `id` int(11) NOT NULL,
-  `nomcat` varchar(100) NOT NULL
+  PRIMARY KEY (id),
+  UNIQUE KEY ux_categorie_nomcat (nomcat)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Collection`
---
+-- ---------------------------------------------------------
+-- TABLE Livre
+-- ---------------------------------------------------------
+CREATE TABLE Livre (
+  isbn             VARCHAR(13) NOT NULL,
+  titre            VARCHAR(255) NOT NULL,
+  auteur           VARCHAR(255) NULL,
+  date_publication DATE NULL,
+  resume           TEXT NULL,
+  editeur          VARCHAR(255) NULL,
+  langue           VARCHAR(50) NULL,
+  categorie_id     INT NULL,
+  statut           ENUM('disponible','indisponible') NOT NULL DEFAULT 'disponible',
+  image_petite     TEXT NULL,
+  image_moyenne    TEXT NULL,
+  image_grande     TEXT NULL,
 
-CREATE TABLE `Collection` (
-  `id_collection` int(11) NOT NULL,
-  `utilisateur_id` int(11) NOT NULL,
-  `livre_isbn` varchar(13) NOT NULL,
-  `date_ajout` datetime DEFAULT current_timestamp()
+  PRIMARY KEY (isbn),
+  KEY ix_livre_categorie (categorie_id),
+
+  CONSTRAINT fk_livre_categorie
+    FOREIGN KEY (categorie_id) REFERENCES Categorie(id)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Diffusion`
---
+-- ---------------------------------------------------------
+-- TABLE Evaluation
+-- (1 note par utilisateur et par livre)
+-- ---------------------------------------------------------
+CREATE TABLE Evaluation (
+  id_evaluation   INT NOT NULL AUTO_INCREMENT,
+  utilisateur_id  INT NOT NULL,
+  livre_isbn      VARCHAR(13) NOT NULL,
+  note            INT NULL,
+  avis            TEXT NULL,
 
-CREATE TABLE `Diffusion` (
-  `id_diffusion` int(11) NOT NULL,
-  `titre` varchar(255) DEFAULT NULL,
-  `contenu` text DEFAULT NULL,
-  `type_contenu` enum('texte','image','lien','fiche_livre') DEFAULT 'texte',
-  `diffuseur_id` int(11) NOT NULL,
-  `date_debut` datetime DEFAULT current_timestamp(),
-  `date_fin` datetime DEFAULT NULL,
-  `actif` tinyint(1) DEFAULT 1,
-  `visibilite` enum('publique','amis','privee') DEFAULT 'publique'
+  PRIMARY KEY (id_evaluation),
+  KEY ix_evaluation_user (utilisateur_id),
+  KEY ix_evaluation_livre (livre_isbn),
+
+  -- Empêche doublon user+livre
+  UNIQUE KEY ux_evaluation_user_livre (utilisateur_id, livre_isbn),
+
+  CONSTRAINT fk_evaluation_user
+    FOREIGN KEY (utilisateur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_evaluation_livre
+    FOREIGN KEY (livre_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CHECK (note IS NULL OR note BETWEEN 0 AND 10)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Echange`
---
+-- ---------------------------------------------------------
+-- TABLE Souhait
+-- (1 occurrence max par utilisateur et par livre)
+-- ---------------------------------------------------------
+CREATE TABLE Souhait (
+  id_souhait      INT NOT NULL AUTO_INCREMENT,
+  utilisateur_id  INT NOT NULL,
+  livre_isbn      VARCHAR(13) NOT NULL,
+  date_ajout      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-CREATE TABLE `Echange` (
-  `id_demande` int(11) NOT NULL,
-  `expediteur_id` int(11) NOT NULL,
-  `livre_demandeur_isbn` varchar(13) NOT NULL,
-  `livre_destinataire_isbn` varchar(13) NOT NULL,
-  `date_echange` datetime DEFAULT current_timestamp(),
-  `statut` enum('demande_envoyee','demande_acceptee_refusee','proposition_confirmee','annulee','terminee') DEFAULT 'demande_envoyee'
+  PRIMARY KEY (id_souhait),
+  KEY ix_souhait_user (utilisateur_id),
+  KEY ix_souhait_livre (livre_isbn),
+
+  UNIQUE KEY ux_souhait_user_livre (utilisateur_id, livre_isbn),
+
+  CONSTRAINT fk_souhait_user
+    FOREIGN KEY (utilisateur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_souhait_livre
+    FOREIGN KEY (livre_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Evaluation`
---
+-- ---------------------------------------------------------
+-- TABLE Collection
+-- (1 occurrence max par utilisateur et par livre)
+-- ---------------------------------------------------------
+CREATE TABLE Collection (
+  id_collection   INT NOT NULL AUTO_INCREMENT,
+  utilisateur_id  INT NOT NULL,
+  livre_isbn      VARCHAR(13) NOT NULL,
+  date_ajout      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-CREATE TABLE `Evaluation` (
-  `id_evaluation` int(11) NOT NULL,
-  `utilisateur_id` int(11) NOT NULL,
-  `livre_isbn` varchar(13) NOT NULL,
-  `note` int(11) DEFAULT NULL CHECK (`note` between 0 and 10),
-  `avis` text DEFAULT NULL
+  PRIMARY KEY (id_collection),
+  KEY ix_collection_user (utilisateur_id),
+  KEY ix_collection_livre (livre_isbn),
+
+  UNIQUE KEY ux_collection_user_livre (utilisateur_id, livre_isbn),
+
+  CONSTRAINT fk_collection_user
+    FOREIGN KEY (utilisateur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_collection_livre
+    FOREIGN KEY (livre_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Livre`
---
+-- ---------------------------------------------------------
+-- TABLE Amitie
+-- empêche doublon A-B / B-A grâce à LEAST/GREATEST en colonnes générées
+-- ---------------------------------------------------------
+CREATE TABLE Amitie (
+  id_amitie        INT NOT NULL AUTO_INCREMENT,
+  utilisateur_1_id INT NOT NULL,
+  utilisateur_2_id INT NOT NULL,
+  statut           ENUM('en_attente','accepte') NOT NULL DEFAULT 'en_attente',
 
-CREATE TABLE `Livre` (
-  `isbn` varchar(13) NOT NULL,
-  `titre` varchar(255) NOT NULL,
-  `auteur` varchar(255) DEFAULT NULL,
-  `date_publication` date DEFAULT NULL,
-  `resume` text DEFAULT NULL,
-  `editeur` varchar(255) DEFAULT NULL,
-  `langue` varchar(50) DEFAULT NULL,
-  `categorie_id` int(11) DEFAULT NULL,
-  `statut` enum('disponible','indisponible') DEFAULT 'disponible',
-  `image_petite` text DEFAULT NULL,
-  `image_moyenne` text DEFAULT NULL,
-  `image_grande` text DEFAULT NULL
+  -- Colonnes "normalisées" (A-B == B-A)
+  utilisateur_min_id INT AS (LEAST(utilisateur_1_id, utilisateur_2_id)) STORED,
+  utilisateur_max_id INT AS (GREATEST(utilisateur_1_id, utilisateur_2_id)) STORED,
+
+  PRIMARY KEY (id_amitie),
+  KEY ix_amitie_u1 (utilisateur_1_id),
+  KEY ix_amitie_u2 (utilisateur_2_id),
+
+  -- Une seule relation par paire d’utilisateurs (peu importe l'ordre)
+  UNIQUE KEY ux_amitie_pair (utilisateur_min_id, utilisateur_max_id),
+
+  CONSTRAINT fk_amitie_u1
+    FOREIGN KEY (utilisateur_1_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_amitie_u2
+    FOREIGN KEY (utilisateur_2_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CHECK (utilisateur_1_id <> utilisateur_2_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Souhait`
---
+-- ---------------------------------------------------------
+-- TABLE Suggestion
+-- empêche doublons exacts + empêche auto-suggestion
+-- ---------------------------------------------------------
+CREATE TABLE Suggestion (
+  id_suggestion    INT NOT NULL AUTO_INCREMENT,
+  expediteur_id    INT NOT NULL,
+  destinataire_id  INT NOT NULL,
+  livre_isbn       VARCHAR(13) NOT NULL,
+  date_suggestion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  acceptee         TINYINT(1) NOT NULL DEFAULT 0,
 
-CREATE TABLE `Souhait` (
-  `id_souhait` int(11) NOT NULL,
-  `utilisateur_id` int(11) NOT NULL,
-  `livre_isbn` varchar(13) NOT NULL,
-  `date_ajout` datetime DEFAULT current_timestamp()
+  PRIMARY KEY (id_suggestion),
+  KEY ix_suggestion_expediteur (expediteur_id),
+  KEY ix_suggestion_destinataire (destinataire_id),
+  KEY ix_suggestion_livre (livre_isbn),
+
+  -- 1 suggestion "identique" max
+  UNIQUE KEY ux_suggestion_triplet (expediteur_id, destinataire_id, livre_isbn),
+
+  CONSTRAINT fk_suggestion_expediteur
+    FOREIGN KEY (expediteur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_suggestion_destinataire
+    FOREIGN KEY (destinataire_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_suggestion_livre
+    FOREIGN KEY (livre_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CHECK (acceptee IN (0,1)),
+  CHECK (expediteur_id <> destinataire_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Suggestion`
---
+-- ---------------------------------------------------------
+-- TABLE Diffusion
+-- ---------------------------------------------------------
+CREATE TABLE Diffusion (
+  id_diffusion  INT NOT NULL AUTO_INCREMENT,
+  titre         VARCHAR(255) NULL,
+  contenu       TEXT NULL,
+  type_contenu  ENUM('texte','image','lien','fiche_livre') NOT NULL DEFAULT 'texte',
+  diffuseur_id  INT NOT NULL,
+  date_debut    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  date_fin      DATETIME NULL,
+  actif         TINYINT(1) NOT NULL DEFAULT 1,
+  visibilite    ENUM('publique','amis','privee') NOT NULL DEFAULT 'publique',
 
-CREATE TABLE `Suggestion` (
-  `id_suggestion` int(11) NOT NULL,
-  `expediteur_id` int(11) NOT NULL,
-  `destinataire_id` int(11) NOT NULL,
-  `livre_isbn` varchar(13) NOT NULL,
-  `date_suggestion` datetime DEFAULT current_timestamp(),
-  `acceptee` tinyint(1) DEFAULT 0
+  PRIMARY KEY (id_diffusion),
+  KEY ix_diffusion_diffuseur (diffuseur_id),
+
+  CONSTRAINT fk_diffusion_diffuseur
+    FOREIGN KEY (diffuseur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CHECK (actif IN (0,1)),
+  CHECK (date_fin IS NULL OR date_fin >= date_debut)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- --------------------------------------------------------
 
---
--- Structure de la table `Utilisateur`
---
+-- ---------------------------------------------------------
+-- TABLE Echange
+-- + empêche échange avec soi-même
+-- + empêche même livre des deux côtés
+-- ---------------------------------------------------------
+CREATE TABLE Echange (
+  id_echange               INT NOT NULL AUTO_INCREMENT,
+  demandeur_id             INT NOT NULL,
+  destinataire_id          INT NOT NULL,
+  livre_demandeur_isbn     VARCHAR(13) NOT NULL,
+  livre_destinataire_isbn  VARCHAR(13) NOT NULL,
+  statut ENUM(
+    'demande_envoyee',
+    'demande_acceptee',
+    'demande_refusee',
+    'proposition_confirmee',
+    'annule',
+    'termine'
+  ) NOT NULL DEFAULT 'demande_envoyee',
+  date_creation     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  date_derniere_maj DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-CREATE TABLE `Utilisateur` (
-  `id_utilisateur` int(11) NOT NULL,
-  `nom_utilisateur` varchar(150) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `mot_de_passe` varchar(128) NOT NULL,
-  `age` int(11) DEFAULT NULL,
-  `sexe` varchar(20) DEFAULT NULL,
-  `religion` varchar(100) DEFAULT NULL,
-  `pays` varchar(100) DEFAULT NULL,
-  `role` enum('lecteur','admin') DEFAULT 'lecteur'
+  PRIMARY KEY (id_echange),
+  KEY ix_echange_demandeur (demandeur_id),
+  KEY ix_echange_destinataire (destinataire_id),
+  KEY ix_echange_livre_demandeur (livre_demandeur_isbn),
+  KEY ix_echange_livre_destinataire (livre_destinataire_isbn),
+
+  CONSTRAINT fk_echange_demandeur
+    FOREIGN KEY (demandeur_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_echange_destinataire
+    FOREIGN KEY (destinataire_id) REFERENCES Utilisateur(id_utilisateur)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_echange_livre_demandeur
+    FOREIGN KEY (livre_demandeur_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT fk_echange_livre_destinataire
+    FOREIGN KEY (livre_destinataire_isbn) REFERENCES Livre(isbn)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CHECK (demandeur_id <> destinataire_id),
+  CHECK (livre_demandeur_isbn <> livre_destinataire_isbn)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Index pour les tables déchargées
---
 
---
--- Index pour la table `Amitie`
---
-ALTER TABLE `Amitie`
-  ADD PRIMARY KEY (`id_amitie`),
-  ADD KEY `utilisateur_1_id` (`utilisateur_1_id`),
-  ADD KEY `utilisateur_2_id` (`utilisateur_2_id`);
-
---
--- Index pour la table `Categorie`
---
-ALTER TABLE `Categorie`
-  ADD PRIMARY KEY (`id`);
-
---
--- Index pour la table `Collection`
---
-ALTER TABLE `Collection`
-  ADD PRIMARY KEY (`id_collection`),
-  ADD KEY `utilisateur_id` (`utilisateur_id`),
-  ADD KEY `livre_isbn` (`livre_isbn`);
-
---
--- Index pour la table `Diffusion`
---
-ALTER TABLE `Diffusion`
-  ADD PRIMARY KEY (`id_diffusion`),
-  ADD KEY `diffuseur_id` (`diffuseur_id`);
-
---
--- Index pour la table `Echange`
---
-ALTER TABLE `Echange`
-  ADD PRIMARY KEY (`id_demande`),
-  ADD KEY `expediteur_id` (`expediteur_id`),
-  ADD KEY `livre_demandeur_isbn` (`livre_demandeur_isbn`),
-  ADD KEY `livre_destinataire_isbn` (`livre_destinataire_isbn`);
-
---
--- Index pour la table `Evaluation`
---
-ALTER TABLE `Evaluation`
-  ADD PRIMARY KEY (`id_evaluation`),
-  ADD KEY `utilisateur_id` (`utilisateur_id`),
-  ADD KEY `livre_isbn` (`livre_isbn`);
-
---
--- Index pour la table `Livre`
---
-ALTER TABLE `Livre`
-  ADD PRIMARY KEY (`isbn`),
-  ADD KEY `categorie_id` (`categorie_id`);
-
---
--- Index pour la table `Souhait`
---
-ALTER TABLE `Souhait`
-  ADD PRIMARY KEY (`id_souhait`),
-  ADD KEY `utilisateur_id` (`utilisateur_id`),
-  ADD KEY `livre_isbn` (`livre_isbn`);
-
---
--- Index pour la table `Suggestion`
---
-ALTER TABLE `Suggestion`
-  ADD PRIMARY KEY (`id_suggestion`),
-  ADD KEY `expediteur_id` (`expediteur_id`),
-  ADD KEY `destinataire_id` (`destinataire_id`),
-  ADD KEY `livre_isbn` (`livre_isbn`);
-
---
--- Index pour la table `Utilisateur`
---
-ALTER TABLE `Utilisateur`
-  ADD PRIMARY KEY (`id_utilisateur`),
-  ADD UNIQUE KEY `email` (`email`);
-
---
--- AUTO_INCREMENT pour les tables déchargées
---
-
---
--- AUTO_INCREMENT pour la table `Amitie`
---
-ALTER TABLE `Amitie`
-  MODIFY `id_amitie` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Categorie`
---
-ALTER TABLE `Categorie`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Collection`
---
-ALTER TABLE `Collection`
-  MODIFY `id_collection` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Diffusion`
---
-ALTER TABLE `Diffusion`
-  MODIFY `id_diffusion` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Echange`
---
-ALTER TABLE `Echange`
-  MODIFY `id_demande` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Evaluation`
---
-ALTER TABLE `Evaluation`
-  MODIFY `id_evaluation` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Souhait`
---
-ALTER TABLE `Souhait`
-  MODIFY `id_souhait` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Suggestion`
---
-ALTER TABLE `Suggestion`
-  MODIFY `id_suggestion` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT pour la table `Utilisateur`
---
-ALTER TABLE `Utilisateur`
-  MODIFY `id_utilisateur` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- Contraintes pour les tables déchargées
---
-
---
--- Contraintes pour la table `Amitie`
---
-ALTER TABLE `Amitie`
-  ADD CONSTRAINT `Amitie_ibfk_1` FOREIGN KEY (`utilisateur_1_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Amitie_ibfk_2` FOREIGN KEY (`utilisateur_2_id`) REFERENCES `Utilisateur` (`id_utilisateur`);
-
---
--- Contraintes pour la table `Collection`
---
-ALTER TABLE `Collection`
-  ADD CONSTRAINT `Collection_ibfk_1` FOREIGN KEY (`utilisateur_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Collection_ibfk_2` FOREIGN KEY (`livre_isbn`) REFERENCES `Livre` (`isbn`);
-
---
--- Contraintes pour la table `Diffusion`
---
-ALTER TABLE `Diffusion`
-  ADD CONSTRAINT `Diffusion_ibfk_1` FOREIGN KEY (`diffuseur_id`) REFERENCES `Utilisateur` (`id_utilisateur`);
-
---
--- Contraintes pour la table `Echange`
---
-ALTER TABLE `Echange`
-  ADD CONSTRAINT `Echange_ibfk_1` FOREIGN KEY (`expediteur_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Echange_ibfk_2` FOREIGN KEY (`livre_demandeur_isbn`) REFERENCES `Livre` (`isbn`),
-  ADD CONSTRAINT `Echange_ibfk_3` FOREIGN KEY (`livre_destinataire_isbn`) REFERENCES `Livre` (`isbn`);
-
---
--- Contraintes pour la table `Evaluation`
---
-ALTER TABLE `Evaluation`
-  ADD CONSTRAINT `Evaluation_ibfk_1` FOREIGN KEY (`utilisateur_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Evaluation_ibfk_2` FOREIGN KEY (`livre_isbn`) REFERENCES `Livre` (`isbn`);
-
---
--- Contraintes pour la table `Livre`
---
-ALTER TABLE `Livre`
-  ADD CONSTRAINT `Livre_ibfk_1` FOREIGN KEY (`categorie_id`) REFERENCES `Categorie` (`id`);
-
---
--- Contraintes pour la table `Souhait`
---
-ALTER TABLE `Souhait`
-  ADD CONSTRAINT `Souhait_ibfk_1` FOREIGN KEY (`utilisateur_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Souhait_ibfk_2` FOREIGN KEY (`livre_isbn`) REFERENCES `Livre` (`isbn`);
-
---
--- Contraintes pour la table `Suggestion`
---
-ALTER TABLE `Suggestion`
-  ADD CONSTRAINT `Suggestion_ibfk_1` FOREIGN KEY (`expediteur_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Suggestion_ibfk_2` FOREIGN KEY (`destinataire_id`) REFERENCES `Utilisateur` (`id_utilisateur`),
-  ADD CONSTRAINT `Suggestion_ibfk_3` FOREIGN KEY (`livre_isbn`) REFERENCES `Livre` (`isbn`);
 COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
