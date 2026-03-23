@@ -21,9 +21,10 @@ class BookDetailsPage extends ConsumerWidget {
     final wishlist = ref.watch(wishlistProvider);
     final myRatingsAsync = ref.watch(myRatingsProvider);
 
-    final bool inCollection = collectionAsync.value?.any((b) => b.isbn == book.isbn) ?? false;
+    final bool inCollection =
+        collectionAsync.value?.any((b) => b.isbn == book.isbn) ?? false;
     final bool inWishlist = wishlist.any((b) => b.isbn == book.isbn);
-    
+
     Rating? myRating;
     if (myRatingsAsync.hasValue) {
       try {
@@ -38,7 +39,9 @@ class BookDetailsPage extends ConsumerWidget {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white), // keeping this line I added earlier
+        leading: const BackButton(
+          color: Colors.white,
+        ), // keeping this line I added earlier
       ),
       body: Container(
         width: double.infinity,
@@ -64,38 +67,50 @@ class BookDetailsPage extends ConsumerWidget {
                             color: Colors.black.withOpacity(0.5),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
-                          )
+                          ),
                         ],
                       ),
-                      child: ClipRRect( // Garantit que l'image respecte les bords arrondis
+                      child: ClipRRect(
+                        // Garantit que l'image respecte les bords arrondis
                         borderRadius: BorderRadius.circular(12),
-                        child: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
+                        child:
+                            (book.imagePetite != null &&
+                                book.imagePetite!.isNotEmpty)
                             ? CachedNetworkImage(
                                 imageUrl: book.imagePetite!,
                                 fit: BoxFit.cover,
                                 // AJOUT DU USER-AGENT POUR AMAZON
                                 httpHeaders: const {
-                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                                  'User-Agent':
+                                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
                                 },
                                 // On utilise imageBuilder pour appliquer le style seulement si l'image charge
-                                imageBuilder: (context, imageProvider) => Container(
-                                  decoration: BoxDecoration(
-                                    image: DecorationImage(
-                                      image: imageProvider,
-                                      fit: BoxFit.cover,
+                                imageBuilder: (context, imageProvider) =>
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        image: DecorationImage(
+                                          image: imageProvider,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
                                     ),
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
                                 ),
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                errorWidget: (context, url, error) => const Icon(
-                                  Icons.broken_image,
-                                  color: Colors.white24,
-                                  size: 48,
-                                ),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(
+                                      Icons.broken_image,
+                                      color: Colors.white24,
+                                      size: 48,
+                                    ),
                               )
-                            : const Icon(Icons.book, size: 48, color: Colors.white24),
+                            : const Icon(
+                                Icons.book,
+                                size: 48,
+                                color: Colors.white24,
+                              ),
                       ),
                     ),
                     const SizedBox(width: 24),
@@ -103,15 +118,12 @@ class BookDetailsPage extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            book.titre,
-                            style: AppTextStyles.heading2,
-                          ),
+                          Text(book.titre, style: AppTextStyles.heading2),
                           const SizedBox(height: 8),
                           Text(
                             book.auteur,
                             style: AppTextStyles.body.copyWith(
-                              fontSize: 18, 
+                              fontSize: 18,
                               color: AppColors.accent,
                               fontWeight: FontWeight.w500,
                             ),
@@ -119,7 +131,10 @@ class BookDetailsPage extends ConsumerWidget {
                           const SizedBox(height: 12),
                           if (book.categorie != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.cardBackground,
                                 borderRadius: BorderRadius.circular(20),
@@ -127,52 +142,67 @@ class BookDetailsPage extends ConsumerWidget {
                               ),
                               child: Text(
                                 book.categorie!,
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                          const SizedBox(height: 8),
+                          Text(
+                            'ISBN: ${book.isbn}',
+                            style: AppTextStyles.caption,
+                          ),
+                          if (book.editeur != null) ...[
+                            const SizedBox(height: 4),
                             Text(
-                              'ISBN: ${book.isbn}',
+                              'Éditeur: ${book.editeur}',
                               style: AppTextStyles.caption,
                             ),
-                            if (book.editeur != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Éditeur: ${book.editeur}',
-                                style: AppTextStyles.caption,
-                              ),
-                            ],
-                            if (book.langue != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Langue: ${book.langue}',
-                                style: AppTextStyles.caption,
-                              ),
-                            ],
                           ],
-                        ),
-                      )
-                    ],
+                          if (book.langue != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Langue: ${book.langue}',
+                              style: AppTextStyles.caption,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _ActionButton(
-                      icon: inCollection ? Icons.library_add_check : Icons.library_add,
+                      icon: inCollection
+                          ? Icons.library_add_check
+                          : Icons.library_add,
                       label: inCollection ? 'Collection' : 'Ma Collection',
                       color: inCollection ? AppColors.success : Colors.white,
                       onTap: () async {
                         try {
                           if (inCollection) {
-                            await ref.read(booksRepositoryProvider).removeFromCollection(book.isbn);
+                            await ref
+                                .read(booksRepositoryProvider)
+                                .removeFromCollection(book.isbn);
                             if (context.mounted) {
-                              AppToast.success(context, "Retiré de la collection");
+                              AppToast.success(
+                                context,
+                                "Retiré de la collection",
+                              );
                             }
                           } else {
-                            await ref.read(booksRepositoryProvider).addToCollection(book.isbn);
+                            await ref
+                                .read(booksRepositoryProvider)
+                                .addToCollection(book.isbn);
                             if (context.mounted) {
-                              AppToast.success(context, "Ajouté à la collection");
+                              AppToast.success(
+                                context,
+                                "Ajouté à la collection",
+                              );
                             }
                           }
                           ref.invalidate(collectionProvider);
@@ -204,9 +234,17 @@ class BookDetailsPage extends ConsumerWidget {
                     ),
                     _ActionButton(
                       icon: myRating != null ? Icons.star : Icons.star_border,
-                      label: myRating != null ? '${myRating!.note}/10' : 'Noter',
+                      label: myRating != null
+                          ? '${myRating!.note}/10'
+                          : 'Noter',
                       color: myRating != null ? Colors.amber : Colors.white,
-                      onTap: () => _openRatingDialog(context, ref, book, myRating?.note ?? 5, myRating?.avis),
+                      onTap: () => _openRatingDialog(
+                        context,
+                        ref,
+                        book,
+                        myRating?.note ?? 5,
+                        myRating?.avis,
+                      ),
                     ),
                   ],
                 ),
@@ -221,7 +259,10 @@ class BookDetailsPage extends ConsumerWidget {
                 ] else
                   const Text(
                     "Aucun résumé disponible.",
-                    style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
               ],
             ),
@@ -278,9 +319,17 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initialNote, String? initialAvis) {
+void _openRatingDialog(
+  BuildContext context,
+  WidgetRef ref,
+  Book book,
+  int initialNote,
+  String? initialAvis,
+) {
   int note = initialNote;
-  final TextEditingController avisController = TextEditingController(text: initialAvis);
+  final TextEditingController avisController = TextEditingController(
+    text: initialAvis,
+  );
 
   showDialog(
     context: context,
@@ -299,7 +348,10 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
               children: [
                 Row(
                   children: [
-                    const Text('Note : ', style: TextStyle(color: Colors.white70)),
+                    const Text(
+                      'Note : ',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                     Expanded(
                       child: Slider(
                         value: note.toDouble(),
@@ -315,7 +367,10 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
                         },
                       ),
                     ),
-                    Text('$note/10', style: const TextStyle(color: Colors.white)),
+                    Text(
+                      '$note/10',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -332,7 +387,10 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Annuler', style: TextStyle(color: Colors.white70)),
+                child: const Text(
+                  'Annuler',
+                  style: TextStyle(color: Colors.white70),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -341,7 +399,9 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
                 ),
                 onPressed: () async {
                   try {
-                    await ref.read(ratingsRepositoryProvider).addOrUpdateRating(
+                    await ref
+                        .read(ratingsRepositoryProvider)
+                        .addOrUpdateRating(
                           isbn: book.isbn,
                           note: note,
                           avis: avisController.text.trim().isEmpty
@@ -354,7 +414,10 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
                     if (ctx.mounted) {
                       Navigator.of(ctx).pop();
                       if (context.mounted) {
-                        AppToast.success(context, 'Note enregistrée pour "${book.titre}"');
+                        AppToast.success(
+                          context,
+                          'Note enregistrée pour "${book.titre}"',
+                        );
                       }
                     }
                   } catch (e) {
