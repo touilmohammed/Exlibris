@@ -5,3 +5,5 @@
 /exlibris_api/__pycache__/
 exlibris_app/.env.local
 exlibris_app/.env.local
+__pycache__/
+*.py[cod]
