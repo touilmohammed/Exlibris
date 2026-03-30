@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/data/auth_repository.dart';
-import '../../books/presentation/search_page.dart';
-import '../../books/presentation/collection_page.dart';
-import '../../books/presentation/wishlist_page.dart';
-import '../../friends/presentation/friends_page.dart';
-import '../../accueil/presentation/accueil_page.dart';
-import '../../../app_router.dart';
 import '../../../core/app_theme.dart';
+import '../../accueil/presentation/accueil_page.dart';
+import '../../books/presentation/search_page.dart';
+import '../../exchanges/presentation/exchanges_page.dart';
+import '../../friends/presentation/friends_page.dart';
+import '../../library/presentation/library_page.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -23,17 +21,12 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // Pages matching navigation order
   List<Widget> get _pages => const [
-        AccueilPage(),     // 0: Accueil
-        CollectionPage(),  // 1: Collection
-        WishlistPage(),    // 2: Souhaits
-        FriendsPage(),     // 3: Amis
-        SearchPage(),      // 4: Explorer
-      ];
-
-  void _logout() async {
-    await ref.read(authRepositoryProvider).signOut();
-    if (mounted) AppRouter.goSignIn(context);
-  }
+    AccueilPage(),
+    LibraryPage(),
+    ExchangesPage(),
+    FriendsPage(),
+    SearchPage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -43,9 +36,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       body: Stack(
         children: [
           // Page content
-          Positioned.fill(
-            child: _pages[_currentIndex],
-          ),
+          Positioned.fill(child: _pages[_currentIndex]),
 
           // Bottom navigation
           Align(
@@ -93,22 +84,22 @@ class _HomePageState extends ConsumerState<HomePage> {
                           _GlassNavItem(
                             index: 1,
                             currentIndex: _currentIndex,
-                            icon: Icons.library_books_rounded,
-                            label: 'Collection',
+                            icon: Icons.bookmarks_rounded,
+                            label: 'Bibliotheque',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 2,
                             currentIndex: _currentIndex,
-                            icon: Icons.favorite_rounded,
-                            label: 'Souhaits',
+                            icon: Icons.swap_horiz_rounded,
+                            label: 'Echanges',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
                             index: 3,
                             currentIndex: _currentIndex,
                             icon: Icons.people_rounded,
-                            label: 'Amis',
+                            label: 'Reseau',
                             onTap: (i) => setState(() => _currentIndex = i),
                           ),
                           _GlassNavItem(
@@ -162,13 +153,17 @@ class _GlassNavItem extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: isActive ? AppColors.success.withOpacity(0.2) : Colors.transparent,
+                color: isActive
+                    ? AppColors.success.withOpacity(0.2)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
                 size: isActive ? 24 : 22,
-                color: isActive ? AppColors.success : Colors.white.withOpacity(0.6),
+                color: isActive
+                    ? AppColors.success
+                    : Colors.white.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 4),
@@ -177,7 +172,9 @@ class _GlassNavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? AppColors.success : Colors.white.withOpacity(0.6),
+                color: isActive
+                    ? AppColors.success
+                    : Colors.white.withOpacity(0.6),
               ),
             ),
           ],

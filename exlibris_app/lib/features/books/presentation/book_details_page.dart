@@ -1,14 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
 import '../../../models/rating.dart';
-import '../data/books_providers.dart';
-import '../data/books_repository.dart';
 import '../../ratings/data/ratings_providers.dart';
 import '../../ratings/data/ratings_repository.dart';
+import '../data/books_providers.dart';
+import '../data/books_repository.dart';
 
 class BookDetailsPage extends ConsumerWidget {
   final Book book;
@@ -17,214 +19,104 @@ class BookDetailsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final collectionAsync = ref.watch(collectionProvider);
+    final collection =
+        ref.watch(collectionProvider).asData?.value ?? const <Book>[];
     final wishlist = ref.watch(wishlistProvider);
-    final myRatingsAsync = ref.watch(myRatingsProvider);
+    final ratingsAsync = ref.watch(myRatingsProvider);
 
-    final bool inCollection = collectionAsync.value?.any((b) => b.isbn == book.isbn) ?? false;
-    final bool inWishlist = wishlist.any((b) => b.isbn == book.isbn);
-    
+    final inCollection = collection.any((item) => item.isbn == book.isbn);
+    final inWishlist = wishlist.any((item) => item.isbn == book.isbn);
+
     Rating? myRating;
-    if (myRatingsAsync.hasValue) {
-      try {
-        myRating = myRatingsAsync.value!.firstWhere((r) => r.isbn == book.isbn);
-      } catch (_) {}
-    }
+    ratingsAsync.whenData((ratings) {
+      for (final rating in ratings) {
+        if (rating.isbn == book.isbn) {
+          myRating = rating;
+          break;
+        }
+      }
+    });
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Détails du livre'),
+        title: const Text('Fiche livre'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white), // keeping this line I added earlier
+        leading: const BackButton(color: Colors.white),
       ),
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: AppDecorations.pageBackground,
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 120,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: AppColors.cardBackground,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          )
-                        ],
-                      ),
-                      child: ClipRRect( // Garantit que l'image respecte les bords arrondis
-                        borderRadius: BorderRadius.circular(12),
-                        child: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
-                            ? CachedNetworkImage(
-                                imageUrl: book.imagePetite!,
-                                fit: BoxFit.cover,
-                                // AJOUT DU USER-AGENT POUR AMAZON
-                                httpHeaders: const {
-                                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                                },
-                                // On utilise imageBuilder pour appliquer le style seulement si l'image charge
-                                imageBuilder: (context, imageProvider) => Container(
-                                  decoration: BoxDecoration(
-                                    image: DecorationImage(
-                                      image: imageProvider,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                                placeholder: (context, url) => const Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                errorWidget: (context, url, error) => const Icon(
-                                  Icons.broken_image,
-                                  color: Colors.white24,
-                                  size: 48,
-                                ),
-                              )
-                            : const Icon(Icons.book, size: 48, color: Colors.white24),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            book.titre,
-                            style: AppTextStyles.heading2,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            book.auteur,
-                            style: AppTextStyles.body.copyWith(
-                              fontSize: 18, 
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          if (book.categorie != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.cardBackground,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: AppColors.cardBorder),
-                              ),
-                              child: Text(
-                                book.categorie!,
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'ISBN: ${book.isbn}',
-                              style: AppTextStyles.caption,
-                            ),
-                            if (book.editeur != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Éditeur: ${book.editeur}',
-                                style: AppTextStyles.caption,
-                              ),
-                            ],
-                            if (book.langue != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Langue: ${book.langue}',
-                                style: AppTextStyles.caption,
-                              ),
-                            ],
-                          ],
-                        ),
-                      )
-                    ],
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            children: [
+              _Hero(book: book),
+              const SizedBox(height: 18),
+              _PrimaryActions(
+                inCollection: inCollection,
+                inWishlist: inWishlist,
+                rating: myRating,
+                onCollectionTap: () async {
+                  try {
+                    if (inCollection) {
+                      await ref
+                          .read(booksRepositoryProvider)
+                          .removeFromCollection(book.isbn);
+                      if (context.mounted) {
+                        AppToast.info(context, 'Retire de la collection');
+                      }
+                    } else {
+                      await ref
+                          .read(booksRepositoryProvider)
+                          .addToCollection(book.isbn);
+                      if (context.mounted) {
+                        AppToast.success(context, 'Ajoute a la collection');
+                      }
+                    }
+                    ref.invalidate(collectionProvider);
+                  } catch (error) {
+                    if (context.mounted) {
+                      AppToast.error(context, 'Erreur : $error');
+                    }
+                  }
+                },
+                onWishlistTap: () async {
+                  final notifier = ref.read(wishlistProvider.notifier);
+                  if (inWishlist) {
+                    await notifier.remove(book);
+                    if (context.mounted) {
+                      AppToast.info(context, 'Retire de la wishlist');
+                    }
+                  } else {
+                    await notifier.add(book);
+                    if (context.mounted) {
+                      AppToast.success(context, 'Ajoute a la wishlist');
+                    }
+                  }
+                },
+                onRatingTap: () => _openRatingDialog(
+                  context,
+                  ref,
+                  book,
+                  myRating?.note ?? 5,
+                  myRating?.avis,
                 ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _ActionButton(
-                      icon: inCollection ? Icons.library_add_check : Icons.library_add,
-                      label: inCollection ? 'Collection' : 'Ma Collection',
-                      color: inCollection ? AppColors.success : Colors.white,
-                      onTap: () async {
-                        try {
-                          if (inCollection) {
-                            await ref.read(booksRepositoryProvider).removeFromCollection(book.isbn);
-                            if (context.mounted) {
-                              AppToast.success(context, "Retiré de la collection");
-                            }
-                          } else {
-                            await ref.read(booksRepositoryProvider).addToCollection(book.isbn);
-                            if (context.mounted) {
-                              AppToast.success(context, "Ajouté à la collection");
-                            }
-                          }
-                          ref.invalidate(collectionProvider);
-                        } catch (e) {
-                          if (context.mounted) {
-                            AppToast.error(context, "Erreur: $e");
-                          }
-                        }
-                      },
-                    ),
-                    _ActionButton(
-                      icon: inWishlist ? Icons.favorite : Icons.favorite_border,
-                      label: inWishlist ? 'Wishlist' : 'Ma Wishlist',
-                      color: inWishlist ? AppColors.error : Colors.white,
-                      onTap: () async {
-                        final notifier = ref.read(wishlistProvider.notifier);
-                        if (inWishlist) {
-                          await notifier.remove(book);
-                          if (context.mounted) {
-                            AppToast.success(context, "Retiré de la wishlist");
-                          }
-                        } else {
-                          await notifier.add(book);
-                          if (context.mounted) {
-                            AppToast.success(context, "Ajouté à la wishlist");
-                          }
-                        }
-                      },
-                    ),
-                    _ActionButton(
-                      icon: myRating != null ? Icons.star : Icons.star_border,
-                      label: myRating != null ? '${myRating!.note}/10' : 'Noter',
-                      color: myRating != null ? Colors.amber : Colors.white,
-                      onTap: () => _openRatingDialog(context, ref, book, myRating?.note ?? 5, myRating?.avis),
-                    ),
-                  ],
+              ),
+              const SizedBox(height: 18),
+              _InfoCard(book: book, rating: myRating),
+              const SizedBox(height: 18),
+              _SectionCard(
+                title: 'Resume',
+                child: Text(
+                  (book.resume != null && book.resume!.trim().isNotEmpty)
+                      ? book.resume!
+                      : 'Aucun resume disponible pour le moment.',
+                  style: AppTextStyles.body.copyWith(height: 1.5),
                 ),
-                const SizedBox(height: 24),
-                if (book.resume != null && book.resume!.isNotEmpty) ...[
-                  const Text("Résumé", style: AppTextStyles.heading3),
-                  const SizedBox(height: 12),
-                  Text(
-                    book.resume!,
-                    style: AppTextStyles.body.copyWith(height: 1.5),
-                  ),
-                ] else
-                  const Text(
-                    "Aucun résumé disponible.",
-                    style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -232,16 +124,160 @@ class BookDetailsPage extends ConsumerWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
+class _Hero extends StatelessWidget {
+  final Book book;
+
+  const _Hero({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppHeroCard(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 118,
+            height: 176,
+            decoration: BoxDecoration(
+              color: AppColors.gradientEnd,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.24),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: book.imagePetite != null && book.imagePetite!.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: book.imagePetite!,
+                    fit: BoxFit.cover,
+                    httpHeaders: const {
+                      'User-Agent':
+                          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                    },
+                    errorWidget: (_, __, ___) => const _CoverFallback(),
+                  )
+                : const _CoverFallback(),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.titre,
+                  style: AppTextStyles.heading2.copyWith(height: 1.15),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  book.auteur.isEmpty ? 'Auteur inconnu' : book.auteur,
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.accent,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (book.categorie != null && book.categorie!.isNotEmpty)
+                  AppCountBadge(
+                    label: book.categorie!,
+                    color: AppColors.accent,
+                  ),
+                const SizedBox(height: 12),
+                Text('ISBN ${book.isbn}', style: AppTextStyles.caption),
+                if (book.editeur != null && book.editeur!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(book.editeur!, style: AppTextStyles.caption),
+                ],
+                if (book.langue != null && book.langue!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(book.langue!, style: AppTextStyles.caption),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrimaryActions extends StatelessWidget {
+  final bool inCollection;
+  final bool inWishlist;
+  final Rating? rating;
+  final VoidCallback onCollectionTap;
+  final VoidCallback onWishlistTap;
+  final VoidCallback onRatingTap;
+
+  const _PrimaryActions({
+    required this.inCollection,
+    required this.inWishlist,
+    required this.rating,
+    required this.onCollectionTap,
+    required this.onWishlistTap,
+    required this.onRatingTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _ActionCard(
+            icon: inCollection
+                ? Icons.library_add_check_rounded
+                : Icons.library_add_rounded,
+            label: inCollection ? 'Collection' : 'Ajouter',
+            tone: AppColors.success,
+            active: inCollection,
+            onTap: onCollectionTap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ActionCard(
+            icon: inWishlist
+                ? Icons.favorite_rounded
+                : Icons.favorite_border_rounded,
+            label: inWishlist ? 'Wishlist' : 'Souhait',
+            tone: AppColors.error,
+            active: inWishlist,
+            onTap: onWishlistTap,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ActionCard(
+            icon: rating != null
+                ? Icons.star_rounded
+                : Icons.star_border_rounded,
+            label: rating != null ? '${rating!.note}/10' : 'Noter',
+            tone: Colors.amber,
+            active: rating != null,
+            onTap: onRatingTap,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
+  final Color tone;
+  final bool active;
   final VoidCallback onTap;
 
-  const _ActionButton({
+  const _ActionCard({
     required this.icon,
     required this.label,
-    required this.color,
+    required this.tone,
+    required this.active,
     required this.onTap,
   });
 
@@ -249,25 +285,30 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 100,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: active
+              ? tone.withOpacity(0.16)
+              : Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: active
+                ? tone.withOpacity(0.35)
+                : Colors.white.withOpacity(0.08),
+          ),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 28),
+            Icon(icon, color: active ? tone : Colors.white70, size: 24),
             const SizedBox(height: 8),
             Text(
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: color,
-                fontSize: 11,
+                color: active ? tone : Colors.white70,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -278,15 +319,113 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initialNote, String? initialAvis) {
-  int note = initialNote;
-  final TextEditingController avisController = TextEditingController(text: initialAvis);
+class _InfoCard extends StatelessWidget {
+  final Book book;
+  final Rating? rating;
 
-  showDialog(
+  const _InfoCard({required this.book, required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'A retenir',
+      child: Column(
+        children: [
+          _InfoRow(
+            label: 'Etat',
+            value: rating != null
+                ? 'Tu as deja note ce livre'
+                : 'Pret a etre ajoute',
+          ),
+          const SizedBox(height: 12),
+          _InfoRow(
+            label: 'Categorie',
+            value: (book.categorie != null && book.categorie!.isNotEmpty)
+                ? book.categorie!
+                : 'Non renseignee',
+          ),
+          const SizedBox(height: 12),
+          _InfoRow(
+            label: 'Langue',
+            value: (book.langue != null && book.langue!.isNotEmpty)
+                ? book.langue!
+                : 'Non renseignee',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(width: 92, child: Text(label, style: AppTextStyles.caption)),
+        Expanded(child: Text(value, style: AppTextStyles.bodyWhite)),
+      ],
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SectionCard({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(title: title),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _CoverFallback extends StatelessWidget {
+  const _CoverFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Icon(
+        Icons.menu_book_rounded,
+        color: Colors.white.withOpacity(0.28),
+        size: 38,
+      ),
+    );
+  }
+}
+
+void _openRatingDialog(
+  BuildContext context,
+  WidgetRef ref,
+  Book book,
+  int initialNote,
+  String? initialAvis,
+) {
+  var note = initialNote;
+  final avisController = TextEditingController(text: initialAvis);
+
+  showDialog<void>(
     context: context,
-    builder: (ctx) {
+    builder: (dialogContext) {
       return StatefulBuilder(
-        builder: (ctx, setStateDialog) {
+        builder: (dialogContext, setStateDialog) {
           return AlertDialog(
             backgroundColor: AppColors.gradientEnd,
             title: Text(
@@ -299,7 +438,10 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
               children: [
                 Row(
                   children: [
-                    const Text('Note : ', style: TextStyle(color: Colors.white70)),
+                    const Text(
+                      'Note : ',
+                      style: TextStyle(color: Colors.white70),
+                    ),
                     Expanded(
                       child: Slider(
                         value: note.toDouble(),
@@ -308,31 +450,35 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
                         divisions: 10,
                         label: '$note',
                         activeColor: AppColors.success,
-                        onChanged: (v) {
+                        onChanged: (value) {
                           setStateDialog(() {
-                            note = v.round();
+                            note = value.round();
                           });
                         },
                       ),
                     ),
-                    Text('$note/10', style: const TextStyle(color: Colors.white)),
+                    Text(
+                      '$note/10',
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: avisController,
                   style: const TextStyle(color: Colors.white),
-                  decoration: AppDecorations.inputDecoration(
-                    label: 'Avis (optionnel)',
-                  ),
+                  decoration: AppDecorations.inputDecoration(label: 'Avis'),
                   maxLines: 3,
                 ),
               ],
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Annuler', style: TextStyle(color: Colors.white70)),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'Annuler',
+                  style: TextStyle(color: Colors.white70),
+                ),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -341,25 +487,24 @@ void _openRatingDialog(BuildContext context, WidgetRef ref, Book book, int initi
                 ),
                 onPressed: () async {
                   try {
-                    await ref.read(ratingsRepositoryProvider).addOrUpdateRating(
+                    await ref
+                        .read(ratingsRepositoryProvider)
+                        .addOrUpdateRating(
                           isbn: book.isbn,
                           note: note,
                           avis: avisController.text.trim().isEmpty
                               ? null
                               : avisController.text.trim(),
                         );
-
                     ref.invalidate(myRatingsProvider);
-
-                    if (ctx.mounted) {
-                      Navigator.of(ctx).pop();
-                      if (context.mounted) {
-                        AppToast.success(context, 'Note enregistrée pour "${book.titre}"');
-                      }
+                    if (!dialogContext.mounted || !context.mounted) {
+                      return;
                     }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      AppToast.error(context, "Erreur : $e");
+                    Navigator.of(dialogContext).pop();
+                    AppToast.success(context, 'Note enregistree');
+                  } catch (error) {
+                    if (context.mounted) {
+                      AppToast.error(context, 'Erreur : $error');
                     }
                   }
                 },
