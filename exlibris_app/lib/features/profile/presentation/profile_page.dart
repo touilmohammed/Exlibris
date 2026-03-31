@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
-import '../data/profile_repository.dart';
-import '../domain/user_profile.dart';
-
 import '../../books/data/books_providers.dart';
 import '../../exchanges/data/exchanges_providers.dart';
 import '../../friends/data/friends_providers.dart';
 import '../../ratings/data/ratings_providers.dart';
-import '../data/payment_service.dart';
+import '../data/profile_repository.dart';
+import '../domain/user_profile.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -28,30 +27,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _isSaving = false;
   String? _error;
 
-  late TextEditingController _nameController;
-  late TextEditingController _emailController;
-  late TextEditingController _ageController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _ageController;
   String? _selectedSexe;
   String? _selectedPays;
 
-  final List<String> _sexeOptions = [
+  final List<String> _sexeOptions = const [
     'Homme',
     'Femme',
     'Non binaire',
-    'Non précisé',
+    'Non precise',
     'Autre',
   ];
 
-  final List<String> _paysOptions = [
+  final List<String> _paysOptions = const [
     'France',
     'Belgique',
     'Suisse',
     'Canada',
-    'Algérie',
+    'Algerie',
     'Maroc',
     'Tunisie',
-    'Sénégal',
-    'Côte d\'Ivoire',
+    'Senegal',
+    'Cote d Ivoire',
     'Cameroun',
     'Autre',
   ];
@@ -76,45 +75,43 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Future<void> _loadProfile() async {
     try {
       final profile = await ref.read(profileRepositoryProvider).getMyProfile();
-      if (mounted) {
-        setState(() {
-          _profile = profile;
-          _nameController.text = profile.nomUtilisateur;
-          _emailController.text = profile.email;
-          _ageController.text = profile.age?.toString() ?? '';
-
-          // Reverse mapping for sexe
-          if (profile.sexe == 'male') {
-            _selectedSexe = 'Homme';
-          } else if (profile.sexe == 'femelle') {
-            _selectedSexe = 'Femme';
-          } else if (profile.sexe == 'indefini') {
-            _selectedSexe = 'Non précisé'; // Default choice for indefini
-          } else {
-            _selectedSexe = null;
-          }
-
-          _selectedPays = profile.pays;
-
-          _loading = false;
-        });
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _profile = profile;
+        _applyProfileToForm(profile);
+        _loading = false;
+        _error = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-        AppToast.error(context, "Erreur de chargement du profil");
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+      AppToast.error(context, 'Erreur de chargement du profil');
     }
   }
 
+  void _applyProfileToForm(UserProfile profile) {
+    _nameController.text = profile.nomUtilisateur;
+    _emailController.text = profile.email;
+    _ageController.text = profile.age?.toString() ?? '';
+    _selectedSexe = switch (profile.sexe) {
+      'male' => 'Homme',
+      'femelle' => 'Femme',
+      'indefini' => 'Non precise',
+      final value => value,
+    };
+    _selectedPays = profile.pays;
+  }
+
   Future<void> _logout() async {
-    // 1. Déconnexion via le repo (suppression du token)
     await ref.read(authRepositoryProvider).signOut();
 
-    // 2. Invalider tous les providers utilisateurs pour vider le cache/état
     ref.invalidate(collectionProvider);
     ref.invalidate(wishlistProvider);
     ref.invalidate(myExchangesProvider);
@@ -123,139 +120,53 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     ref.invalidate(outgoingFriendRequestsProvider);
     ref.invalidate(myRatingsProvider);
 
-    // 3. Redirection
-    if (mounted) context.go('/sign-in');
+    if (mounted) {
+      context.go('/signin');
+    }
   }
 
-  Future<void> _showDonationSheet() async {
-    int amount = 5;
-    String currency = 'eur';
-    final parentContext = context;
+  Future<void> _saveProfile() async {
+    setState(() => _isSaving = true);
+    try {
+      String apiSexe = 'indefini';
+      if (_selectedSexe == 'Homme') {
+        apiSexe = 'male';
+      } else if (_selectedSexe == 'Femme') {
+        apiSexe = 'femelle';
+      }
 
-    await showModalBottomSheet(
-      context: parentContext,
-      backgroundColor: Color(0xFF00261C),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    "Faire un don",
-                    style: AppTextStyles.heading2,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Soutenez Exlibris avec un don.\nChoisissez le montant et la devise.",
-                    style: TextStyle(color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: amount.toString(),
-                          keyboardType: TextInputType.number,
-                          style: AppTextStyles.body,
-                          decoration: const InputDecoration(
-                            labelText: "Montant",
-                            labelStyle: TextStyle(color: Colors.white54),
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (val) {
-                            amount = int.tryParse(val) ?? 5;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      DropdownButton<String>(
-                        value: currency,
-                        dropdownColor: AppColors.backgroundDark,
-                        style: AppTextStyles.body,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'eur',
-                            child: Text('EUR (€)'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'usd',
-                            child: Text('USD (\$)'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setSheetState(() => currency = val);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      final stripeAmount = amount * 100; // in cents
-                      final success = await PaymentService().makePayment(
-                        stripeAmount,
-                        currency,
-                      );
-                      if (!parentContext.mounted) return;
+      await ref
+          .read(profileRepositoryProvider)
+          .updateProfile(
+            nomUtilisateur: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            age: int.tryParse(_ageController.text),
+            sexe: apiSexe,
+            pays: _selectedPays,
+          );
 
-                      if (success) {
-                        ScaffoldMessenger.of(parentContext).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Merci beaucoup pour votre don ! ❤️",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } else {
-                        AppToast.warning(
-                          parentContext,
-                          kIsWeb
-                              ? "Le paiement n'est pas encore disponible sur le web."
-                              : "Le paiement a echoue.",
-                        );
-                      }
-                    },
-                    child: const Text(
-                      "Payer",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+      await _loadProfile();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isEditing = false);
+      AppToast.success(context, 'Profil mis a jour');
+    } catch (_) {
+      if (mounted) {
+        AppToast.error(context, 'Erreur lors de la mise a jour');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _cancelEdit() {
+    if (_profile != null) {
+      _applyProfileToForm(_profile!);
+    }
+    setState(() => _isEditing = false);
   }
 
   @override
@@ -263,10 +174,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text(
-          'Mon Profil',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        title: const Text('Mon profil'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -274,14 +182,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         actions: [
           IconButton(
             onPressed: _logout,
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Se déconnecter',
+            tooltip: 'Se deconnecter',
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
           ),
         ],
       ),
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: AppDecorations.pageBackground,
         child: SafeArea(child: _buildContent()),
       ),
@@ -291,367 +197,586 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget _buildContent() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: AppColors.accent),
+        child: CircularProgressIndicator(color: AppColors.success),
       );
     }
-    if (_error != null) {
+
+    if (_error != null || _profile == null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: AppColors.error, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              "Impossible de charger le profil",
-              style: TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() => _loading = true);
-                _loadProfile();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.black,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Impossible de charger le profil',
+                style: TextStyle(color: Colors.white70),
               ),
-              child: const Text("Réessayer"),
-            ),
-          ],
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _loading = true;
+                    _error = null;
+                  });
+                  _loadProfile();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Reessayer'),
+              ),
+            ],
+          ),
         ),
       );
     }
-    if (_profile == null) return const SizedBox();
 
-    return SingleChildScrollView(
+    final profile = _profile!;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
+      children: [
+        _ProfileHero(profile: profile),
+        const SizedBox(height: 20),
+        _StatGrid(profile: profile),
+        const SizedBox(height: 20),
+        _EditableProfileSection(
+          isEditing: _isEditing,
+          isSaving: _isSaving,
+          nameController: _nameController,
+          emailController: _emailController,
+          ageController: _ageController,
+          selectedSexe: _selectedSexe,
+          selectedPays: _selectedPays,
+          sexeOptions: _sexeOptions,
+          paysOptions: _paysOptions,
+          onSexeChanged: (value) => setState(() => _selectedSexe = value),
+          onPaysChanged: (value) => setState(() => _selectedPays = value),
+          onStartEdit: () => setState(() => _isEditing = true),
+          onCancel: _cancelEdit,
+          onSave: _saveProfile,
+        ),
+        const SizedBox(height: 20),
+        _ProfileSection(
+          title: 'Confiance et activite',
+          subtitle: 'Ton activite actuelle',
+          child: Column(
+            children: [
+              _InfoRow(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Echanges',
+                value: profile.nbLivresCollection > 0
+                    ? 'Collection active'
+                    : 'Ajoute des livres pour commencer',
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                icon: Icons.people_rounded,
+                title: 'Reseau',
+                value: profile.nbAmis > 0
+                    ? '${profile.nbAmis} ami${profile.nbAmis > 1 ? 's' : ''} dans ton espace ExLibris.'
+                    : 'Commence a construire ton reseau de lecteurs.',
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                icon: Icons.favorite_rounded,
+                title: 'Intentions',
+                value: profile.nbLivresWishlist > 0
+                    ? '${profile.nbLivresWishlist} envie${profile.nbLivresWishlist > 1 ? 's' : ''} a surveiller.'
+                    : 'Ta wishlist est vide pour le moment.',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _ProfileSection(
+          title: 'Acces rapides',
+          subtitle: 'Continuer',
+          child: Column(
+            children: [
+              _QuickLink(
+                icon: Icons.swap_horiz_rounded,
+                label: 'Voir mes echanges',
+                onTap: () => context.push('/my-exchanges'),
+              ),
+              const SizedBox(height: 10),
+              _QuickLink(
+                icon: Icons.volunteer_activism_rounded,
+                label: 'Faire un don',
+                onTap: () => context.push('/donate'),
+              ),
+              const SizedBox(height: 10),
+              _QuickLink(
+                icon: Icons.library_books_rounded,
+                label: 'Retour a la bibliotheque',
+                onTap: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditableProfileSection extends StatelessWidget {
+  final bool isEditing;
+  final bool isSaving;
+  final TextEditingController nameController;
+  final TextEditingController emailController;
+  final TextEditingController ageController;
+  final String? selectedSexe;
+  final String? selectedPays;
+  final List<String> sexeOptions;
+  final List<String> paysOptions;
+  final ValueChanged<String?> onSexeChanged;
+  final ValueChanged<String?> onPaysChanged;
+  final VoidCallback onStartEdit;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  const _EditableProfileSection({
+    required this.isEditing,
+    required this.isSaving,
+    required this.nameController,
+    required this.emailController,
+    required this.ageController,
+    required this.selectedSexe,
+    required this.selectedPays,
+    required this.sexeOptions,
+    required this.paysOptions,
+    required this.onSexeChanged,
+    required this.onPaysChanged,
+    required this.onStartEdit,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileSection(
+      title: 'Mes informations',
+      subtitle: isEditing ? 'Modifie puis sauvegarde' : 'Infos de ton compte',
+      child: Column(
+        children: [
+          _FieldRow(
+            label: 'Nom',
+            child: TextFormField(
+              controller: nameController,
+              readOnly: !isEditing,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Nom utilisateur'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Email',
+            child: TextFormField(
+              controller: emailController,
+              readOnly: !isEditing,
+              keyboardType: TextInputType.emailAddress,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Email'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Age',
+            child: TextFormField(
+              controller: ageController,
+              readOnly: !isEditing,
+              keyboardType: TextInputType.number,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Non renseigne'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Sexe',
+            child: isEditing
+                ? DropdownButtonFormField<String>(
+                    initialValue: selectedSexe,
+                    dropdownColor: AppColors.backgroundDark,
+                    style: AppTextStyles.bodyWhite,
+                    items: sexeOptions
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onSexeChanged,
+                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      selectedSexe ?? 'Non renseigne',
+                      style: AppTextStyles.bodyWhite,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Pays',
+            child: isEditing
+                ? DropdownButtonFormField<String>(
+                    initialValue: selectedPays,
+                    dropdownColor: AppColors.backgroundDark,
+                    style: AppTextStyles.bodyWhite,
+                    items: paysOptions
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onPaysChanged,
+                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      selectedPays ?? 'Non renseigne',
+                      style: AppTextStyles.bodyWhite,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 18),
+          if (!isEditing)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onStartEdit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.black,
+                ),
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('Modifier le profil'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isSaving ? null : onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    child: const Text('Annuler'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : onSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Sauvegarder'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(bool editable, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white24),
+      isDense: true,
+      filled: editable,
+      fillColor: editable ? Colors.white.withValues(alpha: 0.05) : null,
+      border: editable
+          ? const OutlineInputBorder()
+          : const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white12),
+            ),
+      enabledBorder: editable
+          ? const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.white24),
+            )
+          : const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white12),
+            ),
+      focusedBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: AppColors.accent),
+      ),
+    );
+  }
+}
+
+class _FieldRow extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _FieldRow({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 74,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(label, style: AppTextStyles.caption),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+class _ProfileHero extends StatelessWidget {
+  final UserProfile profile;
+
+  const _ProfileHero({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppHeroCard(
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          _buildAvatar(),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _nameController,
-            style: AppTextStyles.heading2,
-            readOnly: !_isEditing,
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: "Nom d'utilisateur",
-              hintStyle: const TextStyle(color: Colors.white24),
-              border: _isEditing
-                  ? const UnderlineInputBorder()
-                  : InputBorder.none,
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.08),
+              border: Border.all(
+                color: AppColors.accent.withOpacity(0.6),
+                width: 2,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _emailController,
-            style: AppTextStyles.body,
-            keyboardType: TextInputType.emailAddress,
-            readOnly: !_isEditing,
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: "Email",
-              hintStyle: const TextStyle(color: Colors.white24),
-              border: _isEditing
-                  ? const UnderlineInputBorder()
-                  : InputBorder.none,
+            child: const Icon(
+              Icons.person_rounded,
+              size: 48,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 16),
-          if (_isEditing || (_profile!.age != null))
-            _buildInfoRow(
-              "Âge",
-              TextFormField(
-                controller: _ageController,
-                style: AppTextStyles.body,
-                keyboardType: TextInputType.number,
-                readOnly: !_isEditing,
-                textAlign: TextAlign.end,
-                decoration: InputDecoration(
-                  hintText: "Non renseigné",
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  border: _isEditing
-                      ? const UnderlineInputBorder()
-                      : InputBorder.none,
-                ),
-              ),
+          Text(profile.nomUtilisateur, style: AppTextStyles.heading2),
+          const SizedBox(height: 6),
+          Text(profile.email, style: AppTextStyles.body),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(999),
             ),
-          if (_isEditing || (_profile!.sexe != null))
-            _buildInfoRow(
-              "Sexe",
-              _isEditing
-                  ? DropdownButtonFormField<String>(
-                      initialValue: _selectedSexe,
-                      dropdownColor: AppColors.backgroundDark,
-                      style: AppTextStyles.body,
-                      items: _sexeOptions.map((s) {
-                        return DropdownMenuItem(value: s, child: Text(s));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedSexe = val),
-                      decoration: const InputDecoration(
-                        border: UnderlineInputBorder(),
-                      ),
-                    )
-                  : Text(
-                      _selectedSexe ?? "Non renseigné",
-                      style: AppTextStyles.body,
-                      textAlign: TextAlign.end,
-                    ),
-            ),
-          if (_isEditing || (_profile!.pays != null))
-            _buildInfoRow(
-              "Pays",
-              _isEditing
-                  ? DropdownButtonFormField<String>(
-                      initialValue: _selectedPays,
-                      dropdownColor: AppColors.backgroundDark,
-                      style: AppTextStyles.body,
-                      items: _paysOptions.map((p) {
-                        return DropdownMenuItem(value: p, child: Text(p));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedPays = val),
-                      decoration: const InputDecoration(
-                        border: UnderlineInputBorder(),
-                      ),
-                    )
-                  : Text(
-                      _selectedPays ?? "Non renseigné",
-                      style: AppTextStyles.body,
-                      textAlign: TextAlign.end,
-                    ),
-            ),
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: _buildEditButton()),
-          const SizedBox(height: 48),
-          _buildStatsRow(),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.swap_horiz, color: AppColors.accent),
-              label: const Text(
-                'Mes propositions',
-                style: TextStyle(color: Colors.white),
+            child: const Text(
+              'Profil lecteur actif',
+              style: TextStyle(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
               ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.accent),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: () => context.push('/my-exchanges'),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.favorite, color: Colors.white),
-              label: const Text(
-                'Faire un don',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pinkAccent,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: _showDonationSheet,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildInfoRow(String label, Widget content) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
-          const SizedBox(width: 32),
-          Expanded(child: content),
-        ],
-      ),
-    );
-  }
+class _StatGrid extends StatelessWidget {
+  final UserProfile profile;
 
-  Widget _buildAvatar() {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.cardBackground,
-        border: Border.all(color: AppColors.accent, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: const Icon(Icons.person, size: 64, color: Colors.white),
-    );
-  }
+  const _StatGrid({required this.profile});
 
-  Widget _buildStatsRow() {
+  @override
+  Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildStatItem("Collection", _profile!.nbLivresCollection.toString()),
-        _buildStatItem("Wishlist", _profile!.nbLivresWishlist.toString()),
-        _buildStatItem("Amis", _profile!.nbAmis.toString()),
-      ],
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
+        Expanded(
+          child: _StatCard(
+            label: 'Collection',
+            value: '${profile.nbLivresCollection}',
+            color: AppColors.success,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            label: 'Wishlist',
+            value: '${profile.nbLivresWishlist}',
+            color: AppColors.error,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            label: 'Reseau',
+            value: '${profile.nbAmis}',
             color: AppColors.accent,
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            letterSpacing: 1.0,
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildEditButton() {
-    if (!_isEditing) {
-      return ElevatedButton.icon(
-        icon: const Icon(Icons.edit, color: Colors.black),
-        label: const Text(
-          'Modifier le profil',
-          style: TextStyle(color: Colors.black),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-        onPressed: () => setState(() => _isEditing = true),
-      );
-    }
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
 
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            icon: const Icon(Icons.close, color: Colors.white70),
-            label: const Text(
-              'Annuler',
-              style: TextStyle(color: Colors.white70),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white24),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: _isSaving
-                ? null
-                : () {
-                    setState(() {
-                      _isEditing = false;
-                      // Remettre les données de base
-                      if (_profile != null) {
-                        _nameController.text = _profile!.nomUtilisateur;
-                        _emailController.text = _profile!.email;
-                        _ageController.text = _profile!.age?.toString() ?? '';
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
-                        // Reset sexe
-                        if (_profile!.sexe == 'male') {
-                          _selectedSexe = 'Homme';
-                        } else if (_profile!.sexe == 'femelle') {
-                          _selectedSexe = 'Femme';
-                        } else if (_profile!.sexe == 'indefini') {
-                          _selectedSexe = 'Non précisé';
-                        } else {
-                          _selectedSexe = null;
-                        }
-
-                        _selectedPays = _profile!.pays;
-                      }
-                    });
-                  },
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppDecorations.sectionCard,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: AppTextStyles.heading2.copyWith(fontSize: 24, color: color),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton.icon(
-            icon: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.black,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.check, color: Colors.black),
-            label: const Text(
-              'Sauvegarder',
-              style: TextStyle(color: Colors.black),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: _isSaving
-                ? null
-                : () async {
-                    setState(() => _isSaving = true);
-                    try {
-                      String apiSexe = 'indefini';
-                      if (_selectedSexe == 'Homme') {
-                        apiSexe = 'male';
-                      } else if (_selectedSexe == 'Femme') {
-                        apiSexe = 'femelle';
-                      }
+          const SizedBox(height: 4),
+          Text(label, style: AppTextStyles.caption),
+        ],
+      ),
+    );
+  }
+}
 
-                      await ref
-                          .read(profileRepositoryProvider)
-                          .updateProfile(
-                            nomUtilisateur: _nameController.text,
-                            email: _emailController.text,
-                            age: int.tryParse(_ageController.text),
-                            sexe: apiSexe,
-                            pays: _selectedPays,
-                          );
-                      await _loadProfile();
-                      if (mounted) {
-                        setState(() => _isEditing = false);
-                        AppToast.success(context, "Profil mis à jour");
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        AppToast.error(
-                          context,
-                          "Erreur lors de la mise à jour",
-                        );
-                      }
-                    } finally {
-                      if (mounted) setState(() => _isSaving = false);
-                    }
-                  },
+class _ProfileSection extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _ProfileSection({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(title: title),
+          const SizedBox(height: 6),
+          Text(subtitle, style: AppTextStyles.body),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: AppColors.accent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.bodyWhite.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(value, style: AppTextStyles.caption.copyWith(height: 1.4)),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickLink extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickLink({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.success),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: AppTextStyles.bodyWhite)),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+          ],
+        ),
+      ),
     );
   }
 }
