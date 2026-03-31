@@ -11,6 +11,7 @@ import '../../books/data/books_providers.dart';
 import '../../exchanges/data/exchanges_providers.dart';
 import '../../friends/data/friends_providers.dart';
 import '../../ratings/data/ratings_providers.dart';
+import '../data/payment_service.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -123,6 +124,127 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     // 3. Redirection
     if (mounted) context.go('/sign-in');
+  }
+
+  Future<void> _showDonationSheet() async {
+    int amount = 5;
+    String currency = 'eur';
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Color(0xFF00261C),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    "Faire un don",
+                    style: AppTextStyles.heading2,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    "Soutenez Exlibris avec un don.\nChoisissez le montant et la devise.",
+                    style: TextStyle(color: Colors.white70),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: amount.toString(),
+                          keyboardType: TextInputType.number,
+                          style: AppTextStyles.body,
+                          decoration: const InputDecoration(
+                            labelText: "Montant",
+                            labelStyle: TextStyle(color: Colors.white54),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (val) {
+                            amount = int.tryParse(val) ?? 5;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      DropdownButton<String>(
+                        value: currency,
+                        dropdownColor: AppColors.backgroundDark,
+                        style: AppTextStyles.body,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'eur',
+                            child: Text('EUR (€)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'usd',
+                            child: Text('USD (\$)'),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setSheetState(() => currency = val);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      final stripeAmount = amount * 100; // in cents
+                      final success = await PaymentService().makePayment(
+                        stripeAmount,
+                        currency,
+                      );
+                      if (success && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              "Merci beaucoup pour votre don ! ❤️",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text(
+                      "Payer",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -305,6 +427,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               onPressed: () => context.push('/my-exchanges'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.favorite, color: Colors.white),
+              label: const Text(
+                'Faire un don',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.pinkAccent,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              onPressed: _showDonationSheet,
             ),
           ),
         ],
