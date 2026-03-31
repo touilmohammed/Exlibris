@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/app_theme.dart';
@@ -129,9 +130,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Future<void> _showDonationSheet() async {
     int amount = 5;
     String currency = 'eur';
+    final parentContext = context;
 
     await showModalBottomSheet(
-      context: context,
+      context: parentContext,
       backgroundColor: Color(0xFF00261C),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -217,8 +219,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         stripeAmount,
                         currency,
                       );
-                      if (success && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                      if (!parentContext.mounted) return;
+
+                      if (success) {
+                        ScaffoldMessenger.of(parentContext).showSnackBar(
                           const SnackBar(
                             content: Text(
                               "Merci beaucoup pour votre don ! ❤️",
@@ -229,6 +233,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             ),
                             backgroundColor: Colors.green,
                           ),
+                        );
+                      } else {
+                        AppToast.warning(
+                          parentContext,
+                          kIsWeb
+                              ? "Le paiement n'est pas encore disponible sur le web."
+                              : "Le paiement a echoue.",
                         );
                       }
                     },

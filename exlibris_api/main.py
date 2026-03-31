@@ -72,6 +72,12 @@ def verify_legacy_pbkdf2_password(password: str, stored_password: str) -> bool:
     return hmac.compare_digest(computed_digest, expected_digest)
 
 
+def verify_legacy_sha256_password(password: str, stored_password: str) -> bool:
+    """Compatibilité transitoire avec l'ancien format SHA-256 hexadécimal."""
+    computed_digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return computed_digest == stored_password
+
+
 def verify_password(password: str, stored_password: str) -> bool:
     """Vérifie Argon2id, puis garde une compatibilité legacy si nécessaire."""
     if stored_password.startswith("$argon2id$"):
@@ -81,6 +87,10 @@ def verify_password(password: str, stored_password: str) -> bool:
             return False
     if stored_password.startswith("pbkdf2_sha256$"):
         return verify_legacy_pbkdf2_password(password, stored_password)
+    if len(stored_password) == 64 and all(
+        character in "0123456789abcdef" for character in stored_password.lower()
+    ):
+        return verify_legacy_sha256_password(password, stored_password)
     return password == stored_password
 
 
@@ -370,10 +380,6 @@ def reco_similar(isbn: str, limit: int = 6):
 # --------------------------------------------------------------------
 TOKENS: dict[str, int] = {}  # token -> user_id
 
-def hash_password(password: str) -> str:
-    """Hache un mot de passe en SHA-256."""
-    return hashlib.sha256(password.encode()).hexdigest()
-
 
 # --------------------------------------------------------------------
 # Healthcheck
@@ -474,8 +480,7 @@ def login(body: LoginBody):
 
     conn.close()
 
-    hashed_input = hash_password(body.mot_de_passe)
-    if not row or row[1] != hashed_input:
+    if not row or not verify_password(body.mot_de_passe, row[1]):
         raise HTTPException(status_code=401, detail="Identifiants invalides")
 
     user_id = row[0]
