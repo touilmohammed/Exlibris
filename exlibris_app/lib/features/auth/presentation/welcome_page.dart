@@ -18,16 +18,6 @@ class WelcomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: TextButton(
-                    onPressed: () => AppRouter.goSignIn(context),
-                    child: const Text(
-                      'Connexion',
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ),
-                ),
                 const Spacer(),
                 AppHeroCard(
                   padding: const EdgeInsets.all(24),

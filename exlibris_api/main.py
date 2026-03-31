@@ -11,6 +11,7 @@ import joblib
 from pathlib import Path
 import pandas as pd
 import json
+import hashlib
 from scipy.sparse import load_npz
 from sklearn.metrics.pairwise import linear_kernel
 
@@ -71,6 +72,12 @@ def verify_legacy_pbkdf2_password(password: str, stored_password: str) -> bool:
     return hmac.compare_digest(computed_digest, expected_digest)
 
 
+def verify_legacy_sha256_password(password: str, stored_password: str) -> bool:
+    """Compatibilité transitoire avec l'ancien format SHA-256 hexadécimal."""
+    computed_digest = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return computed_digest == stored_password
+
+
 def verify_password(password: str, stored_password: str) -> bool:
     """Vérifie Argon2id, puis garde une compatibilité legacy si nécessaire."""
     if stored_password.startswith("$argon2id$"):
@@ -80,6 +87,10 @@ def verify_password(password: str, stored_password: str) -> bool:
             return False
     if stored_password.startswith("pbkdf2_sha256$"):
         return verify_legacy_pbkdf2_password(password, stored_password)
+    if len(stored_password) == 64 and all(
+        character in "0123456789abcdef" for character in stored_password.lower()
+    ):
+        return verify_legacy_sha256_password(password, stored_password)
     return password == stored_password
 
 
@@ -160,6 +171,9 @@ class UserProfile(BaseModel):
     id: int
     nom_utilisateur: str
     email: str
+    age: Optional[int] = None
+    sexe: Optional[str] = None
+    pays: Optional[str] = None
     avatar_url: Optional[str] = None
     nb_livres_collection: int = 0
     nb_livres_wishlist: int = 0
@@ -218,6 +232,14 @@ class SimilarBookOut(BaseModel):
     editeur: Optional[str] = None
     image: Optional[str] = None
     similarity: float
+
+class UpdateUserBody(BaseModel):
+    nom_utilisateur: Optional[str] = None
+    email: Optional[EmailStr] = None
+    mot_de_passe: Optional[str] = None
+    age: Optional[int] = None
+    sexe: Optional[str] = None
+    pays: Optional[str] = None
 
 def row_to_exchange(row) -> ExchangeOut:
     return ExchangeOut(
@@ -408,7 +430,6 @@ def signup(body: SignUpBody):
     """Inscription d'un nouvel utilisateur dans la table Utilisateur."""
     conn = get_db_connection()
     cur = conn.cursor()
-    hashed_password = hash_password(body.mot_de_passe)
 
     try:
         # Vérifier si l'email existe déjà
@@ -418,12 +439,13 @@ def signup(body: SignUpBody):
             raise HTTPException(status_code=409, detail="Email déjà utilisé")
 
         # Insérer le nouvel utilisateur
+        hashed_pw = hash_password(body.mot_de_passe)
         cur.execute(
             """
             INSERT INTO Utilisateur (nom_utilisateur, email, mot_de_passe)
             VALUES (%s, %s, %s)
             """,
-            (body.nom_utilisateur, body.email, hashed_password),
+            (body.nom_utilisateur, body.email, hashed_pw),
         )
         conn.commit()
         user_id = cur.lastrowid
@@ -507,8 +529,8 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
     try:
         # Infos user
         cur.execute(
-            "SELECT id_utilisateur, nom_utilisateur, email FROM Utilisateur WHERE id_utilisateur = %s",
-            (current_user_id,),
+            "SELECT id_utilisateur, nom_utilisateur, email, age, sexe, pays FROM Utilisateur WHERE id_utilisateur = %s",
+            (current_user_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -546,11 +568,80 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
         id=row[0],
         nom_utilisateur=row[1],
         email=row[2],
+        age=row[3],
+        sexe=row[4],
+        pays=row[5],
         avatar_url=None,
         nb_livres_collection=nb_col,
         nb_livres_wishlist=nb_wish,
         nb_amis=nb_amis,
     )
+
+
+@app.patch("/me/profile")
+def update_my_profile(
+    body: UpdateUserBody,
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Met à jour les informations de l'utilisateur connecté."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Construire dynamiquement la requête SET
+        updates = []
+        params = []
+
+        if body.nom_utilisateur is not None:
+            updates.append("nom_utilisateur = %s")
+            params.append(body.nom_utilisateur)
+        
+        if body.email is not None:
+            # Vérifier si l'email existe déjà ailleurs
+            cur.execute("SELECT 1 FROM Utilisateur WHERE email = %s AND id_utilisateur <> %s", (body.email, current_user_id))
+            if cur.fetchone():
+                conn.close()
+                raise HTTPException(status_code=409, detail="Email déjà utilisé")
+            updates.append("email = %s")
+            params.append(body.email)
+
+        if body.mot_de_passe is not None:
+            updates.append("mot_de_passe = %s")
+            params.append(hash_password(body.mot_de_passe))
+
+        if body.age is not None:
+            updates.append("age = %s")
+            params.append(body.age)
+
+        if body.sexe is not None:
+            if body.sexe not in ('male', 'femelle', 'indefini'):
+                 raise HTTPException(status_code=400, detail="Sexe invalide (male, femelle, indefini)")
+            updates.append("sexe = %s")
+            params.append(body.sexe)
+
+        if body.pays is not None:
+            updates.append("pays = %s")
+            params.append(body.pays)
+
+        if not updates:
+            conn.close()
+            return {"ok": True, "message": "Aucune modification demandée"}
+
+        sql = f"UPDATE Utilisateur SET {', '.join(updates)} WHERE id_utilisateur = %s"
+        params.append(current_user_id)
+
+        cur.execute(sql, tuple(params))
+        conn.commit()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    
+    conn.close()
+    return {"ok": True, "message": "Profil mis à jour"}
 
 
 # --------------------------------------------------------------------

@@ -5,6 +5,7 @@ import 'features/auth/presentation/sign_in_page.dart';
 import 'features/auth/presentation/sign_up_page.dart';
 import 'features/auth/presentation/welcome_page.dart';
 import 'features/home/presentation/home_page.dart';
+import 'features/profile/presentation/donation_page.dart';
 import 'features/profile/presentation/profile_page.dart';
 import 'features/books/presentation/book_details_page.dart';
 import 'features/exchanges/presentation/pick_my_book_page.dart';
@@ -32,6 +33,10 @@ class AppRouter {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/donate',
+        builder: (context, state) => const DonationPage(),
       ),
       GoRoute(
         path: '/book',

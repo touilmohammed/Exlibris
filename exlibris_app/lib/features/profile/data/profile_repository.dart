@@ -17,4 +17,26 @@ class ProfileRepository {
     final response = await _dio.get('/me/profile');
     return UserProfile.fromJson(response.data);
   }
+
+  Future<void> updateProfile({
+    String? nomUtilisateur,
+    String? email,
+    String? motDePasse,
+    int? age,
+    String? sexe,
+    String? pays,
+  }) async {
+    final data = {
+      if (nomUtilisateur != null) 'nom_utilisateur': nomUtilisateur,
+      if (email != null) 'email': email,
+      if (motDePasse != null) 'mot_de_passe': motDePasse,
+      if (age != null) 'age': age,
+      if (sexe != null) 'sexe': sexe,
+      if (pays != null) 'pays': pays,
+    };
+
+    if (data.isEmpty) return;
+
+    await _dio.patch('/me/profile', data: data);
+  }
 }

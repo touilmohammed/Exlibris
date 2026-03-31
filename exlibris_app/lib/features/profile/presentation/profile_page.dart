@@ -23,32 +23,90 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   UserProfile? _profile;
   bool _loading = true;
+  bool _isEditing = false;
+  bool _isSaving = false;
   String? _error;
+
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _ageController;
+  String? _selectedSexe;
+  String? _selectedPays;
+
+  final List<String> _sexeOptions = const [
+    'Homme',
+    'Femme',
+    'Non binaire',
+    'Non precise',
+    'Autre',
+  ];
+
+  final List<String> _paysOptions = const [
+    'France',
+    'Belgique',
+    'Suisse',
+    'Canada',
+    'Algerie',
+    'Maroc',
+    'Tunisie',
+    'Senegal',
+    'Cote d Ivoire',
+    'Cameroun',
+    'Autre',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _ageController = TextEditingController();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _ageController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
     try {
       final profile = await ref.read(profileRepositoryProvider).getMyProfile();
-      if (mounted) {
-        setState(() {
-          _profile = profile;
-          _loading = false;
-        });
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _profile = profile;
+        _applyProfileToForm(profile);
+        _loading = false;
+        _error = null;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _loading = false;
-        });
-        AppToast.error(context, 'Erreur de chargement du profil');
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+      AppToast.error(context, 'Erreur de chargement du profil');
     }
+  }
+
+  void _applyProfileToForm(UserProfile profile) {
+    _nameController.text = profile.nomUtilisateur;
+    _emailController.text = profile.email;
+    _ageController.text = profile.age?.toString() ?? '';
+    _selectedSexe = switch (profile.sexe) {
+      'male' => 'Homme',
+      'femelle' => 'Femme',
+      'indefini' => 'Non precise',
+      final value => value,
+    };
+    _selectedPays = profile.pays;
   }
 
   Future<void> _logout() async {
@@ -65,6 +123,50 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (mounted) {
       context.go('/signin');
     }
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _isSaving = true);
+    try {
+      String apiSexe = 'indefini';
+      if (_selectedSexe == 'Homme') {
+        apiSexe = 'male';
+      } else if (_selectedSexe == 'Femme') {
+        apiSexe = 'femelle';
+      }
+
+      await ref
+          .read(profileRepositoryProvider)
+          .updateProfile(
+            nomUtilisateur: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            age: int.tryParse(_ageController.text),
+            sexe: apiSexe,
+            pays: _selectedPays,
+          );
+
+      await _loadProfile();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isEditing = false);
+      AppToast.success(context, 'Profil mis a jour');
+    } catch (_) {
+      if (mounted) {
+        AppToast.error(context, 'Erreur lors de la mise a jour');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _cancelEdit() {
+    if (_profile != null) {
+      _applyProfileToForm(_profile!);
+    }
+    setState(() => _isEditing = false);
   }
 
   @override
@@ -142,6 +244,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         const SizedBox(height: 20),
         _StatGrid(profile: profile),
         const SizedBox(height: 20),
+        _EditableProfileSection(
+          isEditing: _isEditing,
+          isSaving: _isSaving,
+          nameController: _nameController,
+          emailController: _emailController,
+          ageController: _ageController,
+          selectedSexe: _selectedSexe,
+          selectedPays: _selectedPays,
+          sexeOptions: _sexeOptions,
+          paysOptions: _paysOptions,
+          onSexeChanged: (value) => setState(() => _selectedSexe = value),
+          onPaysChanged: (value) => setState(() => _selectedPays = value),
+          onStartEdit: () => setState(() => _isEditing = true),
+          onCancel: _cancelEdit,
+          onSave: _saveProfile,
+        ),
+        const SizedBox(height: 20),
         _ProfileSection(
           title: 'Confiance et activite',
           subtitle: 'Ton activite actuelle',
@@ -167,7 +286,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 icon: Icons.favorite_rounded,
                 title: 'Intentions',
                 value: profile.nbLivresWishlist > 0
-                    ? '${profile.nbLivresWishlist} envie${profile.nbLivresWishlist > 1 ? 's' : ''} a surveiller dans ta wishlist.'
+                    ? '${profile.nbLivresWishlist} envie${profile.nbLivresWishlist > 1 ? 's' : ''} a surveiller.'
                     : 'Ta wishlist est vide pour le moment.',
               ),
             ],
@@ -186,6 +305,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               ),
               const SizedBox(height: 10),
               _QuickLink(
+                icon: Icons.volunteer_activism_rounded,
+                label: 'Faire un don',
+                onTap: () => context.push('/donate'),
+              ),
+              const SizedBox(height: 10),
+              _QuickLink(
                 icon: Icons.library_books_rounded,
                 label: 'Retour a la bibliotheque',
                 onTap: () => Navigator.of(context).pop(),
@@ -193,6 +318,233 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _EditableProfileSection extends StatelessWidget {
+  final bool isEditing;
+  final bool isSaving;
+  final TextEditingController nameController;
+  final TextEditingController emailController;
+  final TextEditingController ageController;
+  final String? selectedSexe;
+  final String? selectedPays;
+  final List<String> sexeOptions;
+  final List<String> paysOptions;
+  final ValueChanged<String?> onSexeChanged;
+  final ValueChanged<String?> onPaysChanged;
+  final VoidCallback onStartEdit;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  const _EditableProfileSection({
+    required this.isEditing,
+    required this.isSaving,
+    required this.nameController,
+    required this.emailController,
+    required this.ageController,
+    required this.selectedSexe,
+    required this.selectedPays,
+    required this.sexeOptions,
+    required this.paysOptions,
+    required this.onSexeChanged,
+    required this.onPaysChanged,
+    required this.onStartEdit,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ProfileSection(
+      title: 'Mes informations',
+      subtitle: isEditing ? 'Modifie puis sauvegarde' : 'Infos de ton compte',
+      child: Column(
+        children: [
+          _FieldRow(
+            label: 'Nom',
+            child: TextFormField(
+              controller: nameController,
+              readOnly: !isEditing,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Nom utilisateur'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Email',
+            child: TextFormField(
+              controller: emailController,
+              readOnly: !isEditing,
+              keyboardType: TextInputType.emailAddress,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Email'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Age',
+            child: TextFormField(
+              controller: ageController,
+              readOnly: !isEditing,
+              keyboardType: TextInputType.number,
+              style: AppTextStyles.bodyWhite,
+              decoration: _inputDecoration(isEditing, 'Non renseigne'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Sexe',
+            child: isEditing
+                ? DropdownButtonFormField<String>(
+                    initialValue: selectedSexe,
+                    dropdownColor: AppColors.backgroundDark,
+                    style: AppTextStyles.bodyWhite,
+                    items: sexeOptions
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onSexeChanged,
+                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      selectedSexe ?? 'Non renseigne',
+                      style: AppTextStyles.bodyWhite,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          _FieldRow(
+            label: 'Pays',
+            child: isEditing
+                ? DropdownButtonFormField<String>(
+                    initialValue: selectedPays,
+                    dropdownColor: AppColors.backgroundDark,
+                    style: AppTextStyles.bodyWhite,
+                    items: paysOptions
+                        .map(
+                          (value) => DropdownMenuItem(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: onPaysChanged,
+                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                  )
+                : Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      selectedPays ?? 'Non renseigne',
+                      style: AppTextStyles.bodyWhite,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 18),
+          if (!isEditing)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onStartEdit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.black,
+                ),
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text('Modifier le profil'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isSaving ? null : onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: const BorderSide(color: Colors.white24),
+                    ),
+                    child: const Text('Annuler'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : onSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Sauvegarder'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(bool editable, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white24),
+      isDense: true,
+      filled: editable,
+      fillColor: editable ? Colors.white.withValues(alpha: 0.05) : null,
+      border: editable
+          ? const OutlineInputBorder()
+          : const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white12),
+            ),
+      enabledBorder: editable
+          ? const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.white24),
+            )
+          : const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white12),
+            ),
+      focusedBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: AppColors.accent),
+      ),
+    );
+  }
+}
+
+class _FieldRow extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _FieldRow({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 74,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(label, style: AppTextStyles.caption),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: child),
       ],
     );
   }

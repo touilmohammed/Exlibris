@@ -60,6 +60,66 @@ PODS:
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
+  - Stripe (25.6.4):
+    - StripeApplePay (= 25.6.4)
+    - StripeCore (= 25.6.4)
+    - StripeIssuing (= 25.6.4)
+    - StripePayments (= 25.6.4)
+    - StripePaymentsUI (= 25.6.4)
+    - StripeUICore (= 25.6.4)
+  - stripe_ios (0.0.1):
+    - Flutter
+    - Stripe (~> 25.6.0)
+    - stripe_ios/stripe_ios (= 0.0.1)
+    - stripe_ios/stripe_objc (= 0.0.1)
+    - StripeApplePay (~> 25.6.0)
+    - StripeFinancialConnections (~> 25.6.0)
+    - StripePayments (~> 25.6.0)
+    - StripePaymentSheet (~> 25.6.0)
+    - StripePaymentsUI (~> 25.6.0)
+  - stripe_ios/stripe_ios (0.0.1):
+    - Flutter
+    - Stripe (~> 25.6.0)
+    - stripe_ios/stripe_objc
+    - StripeApplePay (~> 25.6.0)
+    - StripeFinancialConnections (~> 25.6.0)
+    - StripePayments (~> 25.6.0)
+    - StripePaymentSheet (~> 25.6.0)
+    - StripePaymentsUI (~> 25.6.0)
+  - stripe_ios/stripe_objc (0.0.1):
+    - Flutter
+    - Stripe (~> 25.6.0)
+    - StripeApplePay (~> 25.6.0)
+    - StripeFinancialConnections (~> 25.6.0)
+    - StripePayments (~> 25.6.0)
+    - StripePaymentSheet (~> 25.6.0)
+    - StripePaymentsUI (~> 25.6.0)
+  - StripeApplePay (25.6.4):
+    - StripeCore (= 25.6.4)
+  - StripeCore (25.6.4)
+  - StripeFinancialConnections (25.6.4):
+    - StripeCore (= 25.6.4)
+    - StripeUICore (= 25.6.4)
+  - StripeIssuing (25.6.4):
+    - StripeCore (= 25.6.4)
+    - StripePayments (= 25.6.4)
+    - StripePaymentsUI (= 25.6.4)
+  - StripePayments (25.6.4):
+    - StripeCore (= 25.6.4)
+    - StripePayments/Stripe3DS2 (= 25.6.4)
+  - StripePayments/Stripe3DS2 (25.6.4):
+    - StripeCore (= 25.6.4)
+  - StripePaymentSheet (25.6.4):
+    - StripeApplePay (= 25.6.4)
+    - StripeCore (= 25.6.4)
+    - StripePayments (= 25.6.4)
+    - StripePaymentsUI (= 25.6.4)
+  - StripePaymentsUI (25.6.4):
+    - StripeCore (= 25.6.4)
+    - StripePayments (= 25.6.4)
+    - StripeUICore (= 25.6.4)
+  - StripeUICore (25.6.4):
+    - StripeCore (= 25.6.4)
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
@@ -68,6 +128,7 @@ DEPENDENCIES:
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
+  - stripe_ios (from `.symlinks/plugins/stripe_ios/ios`)
 
 SPEC REPOS:
   trunk:
@@ -82,6 +143,15 @@ SPEC REPOS:
     - MLKitVision
     - nanopb
     - PromisesObjC
+    - Stripe
+    - StripeApplePay
+    - StripeCore
+    - StripeFinancialConnections
+    - StripeIssuing
+    - StripePayments
+    - StripePaymentSheet
+    - StripePaymentsUI
+    - StripeUICore
 
 EXTERNAL SOURCES:
   Flutter:
@@ -96,6 +166,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
+  stripe_ios:
+    :path: ".symlinks/plugins/stripe_ios/ios"
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
@@ -115,6 +187,16 @@ SPEC CHECKSUMS:
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  Stripe: 7cb1009980324c6c16b6a4af5843b8ef54549065
+  stripe_ios: eebee52319de946cc0da2d6ddc98a89b04cec95e
+  StripeApplePay: 91000b0927f53c58a2a1f829a4ee246d508bd1c4
+  StripeCore: f6ca805768a7807ec014c0523cd99a3d16d21d6b
+  StripeFinancialConnections: 2cb9bc81468599d1b4b41178f49879a65c8ac52e
+  StripeIssuing: 7ffde774af77d713aff204858fcf765eeb3677d3
+  StripePayments: 4de3976a0d5f626cfc8ad4e010aff1cbda8dc1e5
+  StripePaymentSheet: 29443db7e8635e2d3a00758f1ecebbb17a24ff19
+  StripePaymentsUI: 37551e684263db449368ccac27438947e1b45f84
+  StripeUICore: f1e43a68ab1e1428f8738df821eb64efac1d871a
 
 PODFILE CHECKSUM: 9580a49fa2c095d51100c20f258df867100b916b
 
