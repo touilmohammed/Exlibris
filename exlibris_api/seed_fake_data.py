@@ -1,9 +1,10 @@
 import random
 import string
-import pymysql
-from pymysql import MySQLError
 import hashlib
 from datetime import date
+from argon2 import PasswordHasher
+import pymysql
+from pymysql import MySQLError
 
 DB = dict(
     host="87.106.141.247",
@@ -14,6 +15,11 @@ DB = dict(
     charset="utf8mb4",
     cursorclass=pymysql.cursors.Cursor
 )
+PASSWORD_HASHER = PasswordHasher()
+
+
+def hash_password(password: str) -> str:
+    return PASSWORD_HASHER.hash(password)
 
 def conn():
     return pymysql.connect(**DB)
@@ -82,7 +88,7 @@ def ensure_users(cur, target_users=30):
         role = pick_role()
 
         # Mot de passe simple pour proto
-        mdp = "pass"  # ou random_password()
+        mdp = hash_password("pass")  # ou hash_password(random_password())
 
         cur.execute("""
             INSERT INTO Utilisateur (nom_utilisateur, email, mot_de_passe, age, sexe, pays, role)

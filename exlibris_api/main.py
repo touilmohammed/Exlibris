@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException, Query, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
-import pymysql
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 import os
+import pymysql
 from dotenv import load_dotenv
 import joblib
 from pathlib import Path
@@ -24,6 +26,7 @@ DB_PORT = int(os.getenv("DB_PORT", "3306"))
 DB_USER = os.getenv("DB_USER", "exlibris")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "exlibris")
+PASSWORD_HASHER = PasswordHasher()
 
 
 def get_db_connection(database: str = DB_NAME):
@@ -39,6 +42,56 @@ def get_db_connection(database: str = DB_NAME):
         return conn
     except Exception as e:
         raise RuntimeError(f"Erreur de connexion MariaDB ({database}): {e}")
+
+
+def hash_password(password: str) -> str:
+    """Hash un mot de passe avec Argon2id."""
+    return PASSWORD_HASHER.hash(password)
+
+
+def verify_legacy_pbkdf2_password(password: str, stored_password: str) -> bool:
+    """Compatibilité transitoire avec l'ancien format PBKDF2 maison."""
+    import base64
+    import hashlib
+    import hmac
+
+    try:
+        _, iterations_str, salt_b64, digest_b64 = stored_password.split("$", 3)
+        iterations = int(iterations_str)
+        salt = base64.b64decode(salt_b64.encode("ascii"))
+        expected_digest = base64.b64decode(digest_b64.encode("ascii"))
+    except (ValueError, TypeError):
+        return False
+
+    computed_digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        iterations,
+    )
+    return hmac.compare_digest(computed_digest, expected_digest)
+
+
+def verify_password(password: str, stored_password: str) -> bool:
+    """Vérifie Argon2id, puis garde une compatibilité legacy si nécessaire."""
+    if stored_password.startswith("$argon2id$"):
+        try:
+            return PASSWORD_HASHER.verify(stored_password, password)
+        except (VerifyMismatchError, InvalidHashError):
+            return False
+    if stored_password.startswith("pbkdf2_sha256$"):
+        return verify_legacy_pbkdf2_password(password, stored_password)
+    return password == stored_password
+
+
+def password_needs_rehash(stored_password: str) -> bool:
+    """Détecte les formats legacy et les paramètres Argon2 obsolètes."""
+    if not stored_password.startswith("$argon2id$"):
+        return True
+    try:
+        return PASSWORD_HASHER.check_needs_rehash(stored_password)
+    except InvalidHashError:
+        return True
 
 
 # --------------------------------------------------------------------
@@ -76,7 +129,10 @@ def load_ml():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://auth-univ-corsica.web.app", "http://localhost:3000"],
+    allow_origins=[
+        "https://auth-univ-corsica.web.app",
+    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,7 +145,7 @@ app.add_middleware(
 class SignUpBody(BaseModel):
     email: EmailStr
     nom_utilisateur: str
-    mot_de_passe: str  # ⚠️ en prod : ne jamais stocker en clair
+    mot_de_passe: str
 
 
 class LoginBody(BaseModel):
@@ -423,6 +479,25 @@ def login(body: LoginBody):
         raise HTTPException(status_code=401, detail="Identifiants invalides")
 
     user_id = row[0]
+    if password_needs_rehash(row[1]):
+        upgrade_conn = get_db_connection()
+        upgrade_cur = upgrade_conn.cursor()
+        try:
+            upgrade_cur.execute(
+                """
+                UPDATE Utilisateur
+                SET mot_de_passe = %s
+                WHERE id_utilisateur = %s
+                """,
+                (hash_password(body.mot_de_passe), user_id),
+            )
+            upgrade_conn.commit()
+        except Exception as e:
+            upgrade_conn.rollback()
+            print(f"AUTH DEBUG: Impossible de migrer le hash du user {user_id}: {e}")
+        finally:
+            upgrade_conn.close()
+
     # Générer un token simple (en prod : utiliser JWT)
     import secrets
 
