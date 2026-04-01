@@ -1,30 +1,20 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Header
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
-import pymysql
-import os
-from dotenv import load_dotenv
 import joblib
 from pathlib import Path
 import pandas as pd
 import json
 from scipy.sparse import load_npz
 from sklearn.metrics.pairwise import linear_kernel
-
-# Charger les variables d'environnement depuis .env.local
-load_dotenv('.env.local')
-
-# --------------------------------------------------------------------
-# Config BDD MariaDB (depuis .env)
-# --------------------------------------------------------------------
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
-DB_USER = os.getenv("DB_USER", "exlibris")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_NAME = os.getenv("DB_NAME", "exlibris")
-
-
+from core.database import get_db_connection
+from core.config import DB_NAME, ALLOWED_ORIGINS
+from dependencies.auth import get_current_user_id
+from routers.auth import router as auth_router
+from routers.exchanges import router as exchanges_router
+from routers.payments import router as payments_router
+from contextlib import asynccontextmanager
 
 ML_PIPELINE = None
 ML_PATH = Path(__file__).parent / "ml" / "reco_pipeline.pkl"
@@ -37,42 +27,17 @@ TFIDF_VECT_PATH = Path(__file__).parent / "ml" / "tfidf_vectorizer.pkl"
 TFIDF_MATRIX_PATH = Path(__file__).parent / "ml" / "tfidf_matrix.npz"
 TFIDF_META_PATH = Path(__file__).parent / "ml" / "tfidf_meta.json"
 
-def get_db_connection():
-    try:
-        conn = pymysql.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            cursorclass=pymysql.cursors.Cursor,
-        )
-        return conn
-    except Exception as e:
-        raise RuntimeError(f"Erreur de connexion MariaDB: {e}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global ML_PIPELINE, TFIDF_VECT, TFIDF_MATRIX, TFIDF_META
 
-
-# --------------------------------------------------------------------
-# App FastAPI + CORS
-# --------------------------------------------------------------------
-app = FastAPI(
-    title="ExLibris",
-    description="Api Exlibris.",
-    version="1.0.0",
-    root_path="/exlibris-api",
-)
-
-@app.on_event("startup")
-def load_ml():
-    global ML_PIPELINE
     try:
         ML_PIPELINE = joblib.load(ML_PATH)
         print("[ML] reco_pipeline chargé.")
     except Exception as e:
         ML_PIPELINE = None
         print(f"[ML] Impossible de charger le modèle: {e}")
-        # --- Charger modèle TF-IDF (content-based) ---
-    global TFIDF_VECT, TFIDF_MATRIX, TFIDF_META
+
     try:
         TFIDF_VECT = joblib.load(TFIDF_VECT_PATH)
         TFIDF_MATRIX = load_npz(TFIDF_MATRIX_PATH)
@@ -85,9 +50,20 @@ def load_ml():
         TFIDF_META = None
         print(f"[ML] Impossible de charger TFIDF: {e}")
 
+    yield
+
+
+app = FastAPI(
+    title="ExLibris",
+    description="Api Exlibris.",
+    version="1.0.0",
+    root_path="/exlibris-api",
+    lifespan=lifespan,
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # à restreindre plus tard si besoin
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -97,21 +73,6 @@ app.add_middleware(
 # --------------------------------------------------------------------
 # Modèles Pydantic
 # --------------------------------------------------------------------
-class SignUpBody(BaseModel):
-    email: EmailStr
-    nom_utilisateur: str
-    mot_de_passe: str  # ⚠️ en prod : ne jamais stocker en clair
-
-
-class LoginBody(BaseModel):
-    email: EmailStr
-    mot_de_passe: str
-
-
-class ConfirmBody(BaseModel):
-    token: str
-
-
 class UserProfile(BaseModel):
     id: int
     nom_utilisateur: str
@@ -149,23 +110,6 @@ class RatingOut(BaseModel):
     note: int
     avis: Optional[str] = None
 
-
-class ExchangeCreate(BaseModel):
-    destinataire_id: int
-    livre_demandeur_isbn: str
-    livre_destinataire_isbn: str
-
-
-class ExchangeOut(BaseModel):
-    id_demande: int
-    expediteur_id: int
-    livre_demandeur_isbn: str
-    livre_demandeur_titre: Optional[str] = None
-    livre_destinataire_isbn: str
-    livre_destinataire_titre: Optional[str] = None
-    statut: str
-    date_echange: Optional[str] = None
-
 class SimilarBookOut(BaseModel):
     isbn: str
     titre: str
@@ -174,18 +118,6 @@ class SimilarBookOut(BaseModel):
     image: Optional[str] = None
     similarity: float
 
-def row_to_exchange(row) -> ExchangeOut:
-    return ExchangeOut(
-        id_demande=row[0],
-        expediteur_id=row[1],
-        livre_demandeur_isbn=row[2],
-        livre_demandeur_titre=row[3],
-        livre_destinataire_isbn=row[4],
-        livre_destinataire_titre=row[5],
-        statut=row[6],
-        date_echange=str(row[7]) if row[7] else None,
-    )
-
 class RecommendationOut(BaseModel):
     isbn: str
     titre: str
@@ -193,8 +125,15 @@ class RecommendationOut(BaseModel):
     score: float
 
 
+# --------------------------------------------------------------------
+# Auth (base de données)
+# --------------------------------------------------------------------
+# --------------------------------------------------------------------
+# Sécurité / Dépendance user courant
+# --------------------------------------------------------------------
+
 @app.get("/me/recommendations", response_model=List[RecommendationOut])
-def me_recommendations(limit: int = 10):
+def me_recommendations(limit: int = 10, current_user_id: int = Depends(get_current_user_id)):
     if ML_PIPELINE is None:
         raise HTTPException(status_code=503, detail="Modèle IA non disponible")
 
@@ -207,7 +146,7 @@ def me_recommendations(limit: int = 10):
             SELECT COALESCE(age, 0), COALESCE(pays, 'UNK')
             FROM Utilisateur
             WHERE id_utilisateur = %s
-        """, (CURRENT_USER_ID,))
+        """, (current_user_id,))
         u = cur.fetchone()
         if not u:
             conn.close()
@@ -218,7 +157,7 @@ def me_recommendations(limit: int = 10):
         # Livres déjà possédés
         cur.execute("""
             SELECT livre_isbn FROM Collection WHERE utilisateur_id = %s
-        """, (CURRENT_USER_ID,))
+        """, (current_user_id,))
         owned = {r[0] for r in cur.fetchall()}
 
         # Candidats: derniers livres (tu peux changer la stratégie)
@@ -307,11 +246,6 @@ def reco_similar(isbn: str, limit: int = 6):
 
     return results
 
-# --------------------------------------------------------------------
-# Stockage des tokens actifs (pour le proto)
-# --------------------------------------------------------------------
-TOKENS: dict[str, int] = {}  # token -> user_id
-
 
 # --------------------------------------------------------------------
 # Healthcheck
@@ -324,111 +258,6 @@ def health():
 # --------------------------------------------------------------------
 # Auth (base de données)
 # --------------------------------------------------------------------
-# --------------------------------------------------------------------
-# Sécurité / Dépendance user courant
-# --------------------------------------------------------------------
-from fastapi import Header
-
-def get_current_user_id(authorization: Optional[str] = Header(None)) -> int:
-    """
-    Récupère l'ID utilisateur depuis le header Authorization: Bearer <token>.
-    Vérifie la présence du token dans le dictionnaire TOKENS.
-    """
-    if not authorization:
-        print("AUTH DEBUG: No Authorization header")
-        raise HTTPException(status_code=401, detail="Token manquant")
-    
-    parts = authorization.split(" ")
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        print(f"AUTH DEBUG: Invalid format: {authorization}")
-        raise HTTPException(status_code=401, detail="Format Authorization invalide")
-    
-    token = parts[1]
-    user_id = TOKENS.get(token)
-    print(f"AUTH DEBUG: Token received: {token[:6]}... -> User ID resolved: {user_id}")
-
-    if not user_id:
-         print("AUTH DEBUG: Token not found in TOKENS")
-         raise HTTPException(status_code=401, detail="Token invalide ou expiré")
-    
-    return user_id
-
-
-# --------------------------------------------------------------------
-# Auth (base de données)
-# --------------------------------------------------------------------
-@app.post("/auth/signup")
-def signup(body: SignUpBody):
-    """Inscription d'un nouvel utilisateur dans la table Utilisateur."""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        # Vérifier si l'email existe déjà
-        cur.execute("SELECT 1 FROM Utilisateur WHERE email = %s", (body.email,))
-        if cur.fetchone():
-            conn.close()
-            raise HTTPException(status_code=409, detail="Email déjà utilisé")
-
-        # Insérer le nouvel utilisateur
-        cur.execute(
-            """
-            INSERT INTO Utilisateur (nom_utilisateur, email, mot_de_passe)
-            VALUES (%s, %s, %s)
-            """,
-            (body.nom_utilisateur, body.email, body.mot_de_passe),
-        )
-        conn.commit()
-        user_id = cur.lastrowid
-    except HTTPException:
-        raise
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-    return {"ok": True, "user_id": user_id}
-
-
-@app.post("/auth/login")
-def login(body: LoginBody):
-    """Connexion d'un utilisateur existant."""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        cur.execute(
-            """
-            SELECT id_utilisateur, mot_de_passe FROM Utilisateur WHERE email = %s
-            """,
-            (body.email,),
-        )
-        row = cur.fetchone()
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-
-    if not row or row[1] != body.mot_de_passe:
-        raise HTTPException(status_code=401, detail="Identifiants invalides")
-
-    user_id = row[0]
-    # Générer un token simple (en prod : utiliser JWT)
-    import secrets
-    token = secrets.token_hex(16)
-    TOKENS[token] = user_id
-    print(f"LOGIN DEBUG: User logged in. Email={body.email} -> ID={user_id}. Token={token[:6]}...")
-
-    return {"token": token, "user_id": user_id}
-
-
-@app.post("/auth/confirm")
-def confirm(body: ConfirmBody):
-    # Pour l'instant, on accepte n'importe quel token
-    return {"ok": True, "message": "Email confirmé"}
-
 
 @app.get("/me/profile", response_model=UserProfile)
 def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
@@ -874,31 +703,6 @@ class Friend(BaseModel):
     avatar_url: Optional[str] = None
 
 
-# 1) Amis actuels
-FRIENDS: list[Friend] = [
-    Friend(id=1, nom="Alice"),
-    Friend(id=2, nom="Bob"),
-    Friend(id=3, nom="Charlie"),
-]
-
-# 2) Demandes reçues (en attente)
-PENDING_FRIEND_REQUESTS_INCOMING: list[Friend] = [
-    Friend(id=4, nom="Diane"),
-    Friend(id=5, nom="Ethan"),
-]
-
-# 3) Demandes envoyées (en attente de validation par l’autre)
-PENDING_FRIEND_REQUESTS_OUTGOING: list[Friend] = []
-
-# 4) Candidats possibles pour la recherche (pas encore amis / pas en attente)
-CANDIDATE_FRIENDS: list[Friend] = [
-    Friend(id=6, nom="Fiona"),
-    Friend(id=7, nom="George"),
-    Friend(id=8, nom="Hector"),
-    Friend(id=9, nom="Inès"),
-]
-
-
 @app.get("/friends", response_model=List[Friend])
 def get_friends(current_user_id: int = Depends(get_current_user_id)):
     """Récupère la liste des amis confirmés de l'utilisateur courant."""
@@ -1125,355 +929,6 @@ def send_friend_request(friend_id: int, current_user_id: int = Depends(get_curre
 
 
 # --------------------------------------------------------------------
-# Échanges de livres (proto : CURRENT_USER_ID = 1)
-# --------------------------------------------------------------------
-
-EXCHANGE_ALLOWED_STATUS = {
-    "demande_envoyee",
-    "demande_acceptee",
-    "demande_refusee",
-    "proposition_confirmee",
-    "annule",
-    "termine",
-}
-
-
-@app.post("/exchanges", response_model=ExchangeOut)
-def create_exchange(body: ExchangeCreate, current_user_id: int = Depends(get_current_user_id)):
-    """
-    Crée une nouvelle demande d'échange.
-    NOTE: La BDD ne stocke PAS le destinataire_id dans la table Echange.
-    C'est donc un échange "ouvert" sur le livre destinataire.
-    """
-    if body.destinataire_id == current_user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="On ne peut pas créer un échange avec soi-même.",
-        )
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        # Vérifier que les deux livres existent
-        cur.execute("SELECT 1 FROM Livre WHERE isbn = %s", (body.livre_demandeur_isbn,))
-        if not cur.fetchone():
-            conn.close()
-            raise HTTPException(
-                status_code=404,
-                detail="Livre du demandeur introuvable",
-            )
-
-        cur.execute(
-            "SELECT 1 FROM Livre WHERE isbn = %s",
-            (body.livre_destinataire_isbn,),
-        )
-        if not cur.fetchone():
-            conn.close()
-            raise HTTPException(
-                status_code=404,
-                detail="Livre du destinataire introuvable",
-            )
-
-        # Insertion de l'échange (SANS destinataire_id, car colonne inexistante)
-        cur.execute(
-            """
-            INSERT INTO Echange (
-                expediteur_id,
-                livre_demandeur_isbn,
-                livre_destinataire_isbn,
-                statut,
-                date_echange
-            )
-            VALUES (%s, %s, %s, 'demande_envoyee', CURRENT_TIMESTAMP)
-            """,
-            (
-                current_user_id,
-                body.livre_demandeur_isbn,
-                body.livre_destinataire_isbn,
-            ),
-        )
-        id_demande = cur.lastrowid
-
-        # Récupérer la ligne pour la renvoyer
-        cur.execute(
-            """
-            SELECT
-                e.id_demande,
-                e.expediteur_id,
-                e.livre_demandeur_isbn,
-                l1.titre,
-                e.livre_destinataire_isbn,
-                l2.titre,
-                e.statut,
-                e.date_echange
-            FROM Echange e
-            LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
-            LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
-            WHERE e.id_demande = %s
-            """,
-            (id_demande,),
-        )
-        row = cur.fetchone()
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-    return row_to_exchange(row)
-
-
-@app.get("/me/exchanges", response_model=List[ExchangeOut])
-def list_my_exchanges(
-    role: Optional[str] = Query(
-        default=None,
-        description="Filtre sur le rôle : 'demandeur', 'destinataire' ou vide pour tout",
-    ),
-    statut: Optional[str] = Query(
-        default=None,
-        description="Filtre sur le statut",
-    ),
-    current_user_id: int = Depends(get_current_user_id)
-):
-    """
-    Liste les échanges.
-    - Demandeur = expediteur_id est MOI
-    - Destinataire = livre_destinataire_isbn est DANS MA COLLECTION
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    # On récupère TOUS les échanges qui me concernent
-    # Soit je l'ai envoyé (expediteur_id = ME)
-    # Soit je "possède" le livre demandé (livre_destinataire_isbn IN MyCollection)
-    sql = """
-        SELECT
-            e.id_demande,
-            e.expediteur_id,
-            e.livre_demandeur_isbn,
-            l1.titre as titre_demandeur,
-            e.livre_destinataire_isbn,
-            l2.titre as titre_destinataire,
-            e.statut,
-            e.date_echange
-        FROM Echange e
-        LEFT JOIN Collection c ON e.livre_destinataire_isbn = c.livre_isbn AND c.utilisateur_id = %s
-        LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
-        LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
-        WHERE e.expediteur_id = %s OR c.utilisateur_id IS NOT NULL
-    """
-    params = [current_user_id, current_user_id]
-
-    # Note: le filtrage par role/statut est plus complexe en SQL direct ici
-    # on va filtrer en Python pour simplifier la logique "destinataire dynamique"
-    
-    try:
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-
-    results = []
-    for row in rows:
-        exc = row_to_exchange(row)
-        
-        # Determine my role
-        is_sender = (exc.expediteur_id == current_user_id)
-        # Recipient logic handled by the query (if I wasn't sender, I must be recipient)
-        
-        if role == "demandeur" and not is_sender:
-            continue
-        if role == "destinataire" and is_sender:
-            continue
-            
-        if statut and exc.statut != statut:
-            continue
-            
-        results.append(exc)
-
-    return results
-
-
-def _get_exchange_for_update(cur, exchange_id: int):
-    cur.execute(
-        """
-        SELECT
-            e.id_demande,
-            e.expediteur_id,
-            e.livre_demandeur_isbn,
-            l1.titre,
-            e.livre_destinataire_isbn,
-            l2.titre,
-            e.statut,
-            e.date_echange
-        FROM Echange e
-        LEFT JOIN Livre l1 ON e.livre_demandeur_isbn = l1.isbn
-        LEFT JOIN Livre l2 ON e.livre_destinataire_isbn = l2.isbn
-        WHERE e.id_demande = %s
-        """,
-        (exchange_id,),
-    )
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Échange introuvable")
-    return row
-
-
-@app.post("/exchanges/{exchange_id}/accept", response_model=ExchangeOut)
-def accept_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
-    """
-    Accepte l'échange. Vérifie que je possède le livre demandé.
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        row = _get_exchange_for_update(cur, exchange_id)
-        # row: id, expediteur, livre_dem, titre_dem, livre_dest, titre_dest, statut, date
-        livre_dest_isbn = row[4]
-        statut = row[6]
-
-        # Vérifier que JE possède le livre destinataire
-        cur.execute(
-            "SELECT 1 FROM Collection WHERE utilisateur_id = %s AND livre_isbn = %s",
-            (current_user_id, livre_dest_isbn)
-        )
-        if not cur.fetchone():
-            raise HTTPException(
-                status_code=403,
-                detail="Vous ne possédez pas le livre demandé, impossible d'accepter.",
-            )
-
-        if statut != "demande_envoyee":
-            raise HTTPException(
-                status_code=400,
-                detail="Statut invalide pour acceptation.",
-            )
-
-        cur.execute(
-            """
-            UPDATE Echange
-            SET statut = 'proposition_confirmee'
-            WHERE id_demande = %s
-            """,
-            (exchange_id,),
-        )
-        
-        # --- ECHANGE DES LIVRES DANS LA COLLECTION ---
-        expediteur_id = row[1]
-        livre_demandeur_isbn = row[2]
-        # livre_dest_isbn = row[4] (déjà récupéré au dessus)
-
-        # 1. Le livre de l'expéditeur (demandeur) devient le mien (destinataire)
-        # On vérifie d'abord que l'expéditeur l'a bien toujours (sécurité)
-        cur.execute(
-            """
-            UPDATE Collection
-            SET utilisateur_id = %s
-            WHERE utilisateur_id = %s AND livre_isbn = %s
-            """,
-            (current_user_id, expediteur_id, livre_demandeur_isbn)
-        )
-        
-        # 2. Mon livre (destinataire) devient celui de l'expéditeur
-        cur.execute(
-            """
-            UPDATE Collection
-            SET utilisateur_id = %s
-            WHERE utilisateur_id = %s AND livre_isbn = %s
-            """,
-            (expediteur_id, current_user_id, livre_dest_isbn)
-        )
-        # ---------------------------------------------
-        
-        # Re-fetch for return
-        row = _get_exchange_for_update(cur, exchange_id)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-    return row_to_exchange(row)
-
-
-@app.post("/exchanges/{exchange_id}/refuse", response_model=ExchangeOut)
-def refuse_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        row = _get_exchange_for_update(cur, exchange_id)
-        livre_dest_isbn = row[4]
-        
-        # Vérifier que JE possède le livre (donc je suis légitime pour refuser)
-        cur.execute(
-            "SELECT 1 FROM Collection WHERE utilisateur_id = %s AND livre_isbn = %s",
-            (current_user_id, livre_dest_isbn)
-        )
-        if not cur.fetchone():
-             raise HTTPException(status_code=403, detail="Non autorisé")
-
-        cur.execute(
-            """
-            UPDATE Echange
-            SET statut = 'annulee'
-            WHERE id_demande = %s
-            """,
-            (exchange_id,),
-        )
-        row = _get_exchange_for_update(cur, exchange_id)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-    return row_to_exchange(row)
-
-
-@app.post("/exchanges/{exchange_id}/cancel", response_model=ExchangeOut)
-def cancel_exchange(exchange_id: int, current_user_id: int = Depends(get_current_user_id)):
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        row = _get_exchange_for_update(cur, exchange_id)
-        expediteur_id = row[1]
-
-        if expediteur_id != current_user_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Seul le demandeur peut annuler.",
-            )
-
-        cur.execute(
-            """
-            UPDATE Echange
-            SET statut = 'annulee'
-            WHERE id_demande = %s
-            """,
-            (exchange_id,),
-        )
-        row = _get_exchange_for_update(cur, exchange_id)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-    return row_to_exchange(row)
-
-
-# --------------------------------------------------------------------
 # Évaluations (notes / avis) utilisateur (proto : user_id=1)
 # --------------------------------------------------------------------
 
@@ -1584,3 +1039,8 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None), current_user_id: i
         RatingOut(isbn=row[0], note=row[1], avis=row[2])
         for row in rows
     ]
+
+
+app.include_router(auth_router)
+app.include_router(exchanges_router)
+app.include_router(payments_router)
