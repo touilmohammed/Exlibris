@@ -14,6 +14,7 @@ from dependencies.auth import get_current_user_id
 from routers.auth import router as auth_router
 from routers.exchanges import router as exchanges_router
 from routers.payments import router as payments_router
+from routers.stripe import router as stripe_router
 from contextlib import asynccontextmanager
 
 ML_PIPELINE = None
@@ -1044,3 +1045,4 @@ def get_my_ratings(isbn: Optional[str] = Query(default=None), current_user_id: i
 app.include_router(auth_router)
 app.include_router(exchanges_router)
 app.include_router(payments_router)
+app.include_router(stripe_router)
