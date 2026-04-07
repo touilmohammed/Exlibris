@@ -70,6 +70,20 @@ class BooksRepository {
     throw Exception('Format de réponse /me/collection invalide : ${res.data}');
   }
 
+  /// Récupérer les recommandations de livres pour l’utilisateur
+  Future<List<Book>> getRecommendations() async {
+    final res = await _dio.get('/me/recommendations');
+    if (res.data is List) {
+      final data = res.data as List;
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((m) => Book.fromJson(m))
+          .toList();
+    }
+    throw Exception(
+        'Format de réponse /me/recommendations invalide : ${res.data}');
+  }
+
   /// Ajouter un livre à la collection
   Future<void> addToCollection(String isbn) async {
     await _dio.post('/me/collection', data: {'isbn': isbn});

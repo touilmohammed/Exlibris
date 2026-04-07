@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
@@ -31,17 +33,31 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.gradientEnd,
-        title: const Text('Confirmer l\'échange',
-            style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Tu proposes :\n"${widget.myBook.titre}"\n\nContre :\n"${theirBook.titre}"',
-          style: const TextStyle(color: Colors.white70),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Confirmer la proposition',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tu proposes', style: AppTextStyles.caption),
+            const SizedBox(height: 4),
+            Text(widget.myBook.titre, style: AppTextStyles.bodyWhite),
+            const SizedBox(height: 14),
+            Text('Tu demandes', style: AppTextStyles.caption),
+            const SizedBox(height: 4),
+            Text(theirBook.titre, style: AppTextStyles.bodyWhite),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child:
-                const Text('Annuler', style: TextStyle(color: Colors.white70)),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -49,13 +65,15 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmer'),
+            child: const Text('Envoyer'),
           ),
         ],
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
 
     setState(() => _submitting = true);
 
@@ -67,110 +85,274 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
         livreDestinataireIsbn: theirBook.isbn,
       );
 
-      if (!mounted) return;
-      AppToast.success(context, 'Échange proposé avec succès !');
+      if (!mounted) {
+        return;
+      }
 
-      // Retour à l'accueil (ou liste amis)
-      context.go('/home'); 
+      AppToast.success(context, 'Echange propose avec succes');
+      context.go('/home');
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       AppToast.error(context, 'Erreur : $e');
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_submitting) {
-      return const Scaffold(
-        backgroundColor: AppColors.backgroundDark,
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final theirCollectionAsync =
-        ref.watch(friendCollectionProvider(widget.friend.id));
+    final theirCollectionAsync = ref.watch(
+      friendCollectionProvider(widget.friend.id),
+    );
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text('Je reçois (de ${widget.friend.nom})...'),
+        title: const Text('Proposer un echange'),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
       ),
-      body: theirCollectionAsync.when(
-        data: (books) {
-          if (books.isEmpty) {
-            return Center(
-              child: Text(
-                '${widget.friend.nom} n\'a aucun livre dans sa collection.',
-                style: const TextStyle(color: Colors.white70),
-              ),
-            );
-          }
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 0.65,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: books.length,
-            itemBuilder: (context, index) {
-              final book = books[index];
-              final hasImage =
-                  book.imagePetite != null && book.imagePetite!.isNotEmpty;
-
-              return InkWell(
-                onTap: () => _processExchange(book),
-                borderRadius: BorderRadius.circular(12),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: AppColors.cardBackground,
-                          image: hasImage
-                              ? DecorationImage(
-                                  image: NetworkImage(book.imagePetite!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
+      body: Container(
+        decoration: AppDecorations.pageBackground,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              theirCollectionAsync.when(
+                data: (books) {
+                  if (books.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: AppEmptyStateCard(
+                          icon: Icons.inventory_2_outlined,
+                          title:
+                              '${widget.friend.nom} n a aucun livre a proposer.',
+                          subtitle:
+                              'Tu pourras lancer un echange quand sa collection sera remplie.',
                         ),
-                        child: !hasImage
-                            ? const Center(
-                                child: Icon(Icons.book,
-                                    color: Colors.white24, size: 32),
-                              )
-                            : null,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      book.titre,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
+                    );
+                  }
+
+                  return CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          child: Column(
+                            children: [
+                              AppHeroCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const AppCountBadge(label: 'Etape 2'),
+                                        const Spacer(),
+                                        const AppIconBadge(
+                                          icon: Icons.check_circle_outline,
+                                          color: AppColors.accent,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Text(
+                                      'Choisis le livre que tu souhaites recevoir',
+                                      style: AppTextStyles.heading3.copyWith(
+                                        fontSize: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tu proposes "${widget.myBook.titre}" a ${widget.friend.nom}.',
+                                      style: AppTextStyles.body,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              AppSurfaceCard(
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
+                                  children: [
+                                    _MiniCover(book: widget.myBook),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Livre propose',
+                                            style: AppTextStyles.caption,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            widget.myBook.titre,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: AppTextStyles.bodyWhite
+                                                .copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        sliver: SliverGrid(
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final book = books[index];
+                            return _ExchangeTargetCard(
+                              book: book,
+                              onTap: () => _processExchange(book),
+                            );
+                          }, childCount: books.length),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.72,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.success),
                 ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Text('Erreur: $err',
-              style: const TextStyle(color: AppColors.error)),
+                error: (err, _) => Center(
+                  child: Text(
+                    'Erreur : $err',
+                    style: const TextStyle(color: AppColors.error),
+                  ),
+                ),
+              ),
+              if (_submitting)
+                Container(
+                  color: Colors.black.withOpacity(0.35),
+                  child: const Center(
+                    child: CircularProgressIndicator(color: AppColors.success),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _ExchangeTargetCard extends StatelessWidget {
+  final Book book;
+  final VoidCallback onTap;
+
+  const _ExchangeTargetCard({required this.book, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AppSurfaceCard(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.gradientEnd,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: book.imagePetite != null && book.imagePetite!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: book.imagePetite!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) =>
+                            const _CompactBookPlaceholder(),
+                      )
+                    : const _CompactBookPlaceholder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              book.titre,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyWhite.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              book.auteur.isEmpty ? 'Auteur inconnu' : book.auteur,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: 8),
+            const AppCountBadge(label: 'Je recois', color: AppColors.accent),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniCover extends StatelessWidget {
+  final Book book;
+
+  const _MiniCover({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 66,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        color: AppColors.gradientEnd,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: book.imagePetite != null && book.imagePetite!.isNotEmpty
+          ? CachedNetworkImage(
+              imageUrl: book.imagePetite!,
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => const _CompactBookPlaceholder(),
+            )
+          : const _CompactBookPlaceholder(),
+    );
+  }
+}
+
+class _CompactBookPlaceholder extends StatelessWidget {
+  const _CompactBookPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Icon(Icons.menu_book_rounded, color: Colors.white24, size: 28),
     );
   }
 }

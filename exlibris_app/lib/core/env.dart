@@ -7,4 +7,9 @@ class Env {
   /// Pour production: http://87.106.141.247/exlibris-api
   static String get apiBaseUrl =>
       dotenv.env['API_BASE_URL'] ?? 'http://192.168.1.13:8000';
+
+  static String get stripeSecretKey => dotenv.env['STRIPE_SECRET_KEY'] ?? '';
+
+  static String get stripePublishableKey =>
+      dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
 }

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart'; // Add import
 
+import '../../../core/app_components.dart';
+import '../../../core/app_theme.dart';
+import '../../../core/app_toast.dart';
 import '../../../models/friend.dart';
 import '../../friends/data/friends_repository.dart';
-import '../../../core/app_theme.dart';
 import 'suggest_book_sheet.dart';
-import '../../exchanges/data/exchanges_repository.dart';
 
 class FriendsPage extends ConsumerStatefulWidget {
   const FriendsPage({super.key});
@@ -81,14 +82,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
           _friends.add(friend);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Demande acceptée : ${friend.nom}')),
-      );
+      AppToast.success(context, 'Demande acceptee');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur acceptation : $e')),
-      );
+      AppToast.error(context, 'Erreur : $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -102,14 +99,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
       setState(() {
         _incoming.removeWhere((f) => f.id == friend.id);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Demande refusée : ${friend.nom}')),
-      );
+      AppToast.info(context, 'Demande refusee');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur refus : $e')),
-      );
+      AppToast.error(context, 'Erreur : $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -131,11 +124,17 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler', style: TextStyle(color: Colors.white70)),
+            child: const Text(
+              'Annuler',
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -150,14 +149,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
       setState(() {
         _friends.removeWhere((f) => f.id == friend.id);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ami supprimé : ${friend.nom}')),
-      );
+      AppToast.info(context, 'Ami supprime');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur suppression : $e')),
-      );
+      AppToast.error(context, 'Erreur : $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -202,14 +197,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
           _outgoing.add(friend);
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Demande envoyée à ${friend.nom}')),
-      );
+      AppToast.success(context, 'Demande envoyee');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur envoi demande : $e')),
-      );
+      AppToast.error(context, 'Erreur : $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -227,7 +218,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
     );
   }
 
-   void _openExchangeDialog(Friend friend) {
+  void _openExchangeDialog(Friend friend) {
     context.push('/exchange/pick-mine', extra: friend);
   }
 
@@ -260,7 +251,11 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
     );
   }
 
-  Widget _buildFriendCard(Friend f, {required List<Widget> actions, String? subtitle}) {
+  Widget _buildFriendCard(
+    Friend f, {
+    required List<Widget> actions,
+    String? subtitle,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: AppDecorations.cardDecoration,
@@ -270,15 +265,17 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
           backgroundColor: AppColors.gradientEnd,
           child: Text(
             f.nom.isNotEmpty ? f.nom[0].toUpperCase() : '?',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         title: Text(f.nom, style: AppTextStyles.bodyWhite),
-        subtitle: subtitle != null ? Text(subtitle, style: AppTextStyles.caption) : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: actions,
-        ),
+        subtitle: subtitle != null
+            ? Text(subtitle, style: AppTextStyles.caption)
+            : null,
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),
       ),
     );
   }
@@ -296,10 +293,42 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
-              // Header
-              const Text('Amis', style: AppTextStyles.heading2),
-              const SizedBox(height: 4),
-              Text('Gère tes amis et découvre de nouveaux contacts', style: AppTextStyles.body),
+              const AppPageHeader(
+                title: 'Reseau',
+                subtitle: 'Tes amis et tes demandes',
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _summaryCard(
+                      icon: Icons.people_rounded,
+                      value: '${_friends.length}',
+                      label: 'Amis',
+                      tone: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _summaryCard(
+                      icon: Icons.mark_email_unread_rounded,
+                      value: '${_incoming.length}',
+                      label: 'Demandes',
+                      tone: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _summaryCard(
+                      icon: Icons.outbox_rounded,
+                      value: '${_outgoing.length}',
+                      label: 'Envoyees',
+                      tone: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
 
               if (_loading)
                 Padding(
@@ -319,7 +348,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                       color: AppColors.error.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(_error!, style: const TextStyle(color: AppColors.error)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
                   ),
                 ),
 
@@ -333,7 +365,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                     actions: [
                       IconButton(
                         tooltip: 'Accepter',
-                        icon: const Icon(Icons.check_circle, color: AppColors.success),
+                        icon: const Icon(
+                          Icons.check_circle,
+                          color: AppColors.success,
+                        ),
                         onPressed: () => _accept(f),
                       ),
                       IconButton(
@@ -349,7 +384,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
               // My friends
               _buildSectionTitle('Mes amis', count: _friends.length),
               if (_friends.isEmpty)
-                Text('Tu n\'as pas encore d\'amis.', style: AppTextStyles.body)
+                Text('Aucun ami pour le moment.', style: AppTextStyles.body)
               else
                 ..._friends.map(
                   (f) => _buildFriendCard(
@@ -357,17 +392,29 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                     actions: [
                       IconButton(
                         tooltip: 'Suggérer un livre',
-                        icon: const Icon(Icons.menu_book, color: Colors.white54, size: 20),
+                        icon: const Icon(
+                          Icons.menu_book,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
                         onPressed: () => _openSuggestSheet(f),
                       ),
                       IconButton(
                         tooltip: 'Proposer un échange',
-                        icon: const Icon(Icons.swap_horiz, color: Colors.white54, size: 20),
+                        icon: const Icon(
+                          Icons.swap_horiz,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
                         onPressed: () => _openExchangeDialog(f),
                       ),
                       IconButton(
                         tooltip: 'Supprimer',
-                        icon: const Icon(Icons.person_remove, color: Colors.white38, size: 20),
+                        icon: const Icon(
+                          Icons.person_remove,
+                          color: Colors.white38,
+                          size: 20,
+                        ),
                         onPressed: () => _removeFriend(f),
                       ),
                     ],
@@ -382,14 +429,18 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                     f,
                     subtitle: 'En attente de réponse',
                     actions: const [
-                      Icon(Icons.hourglass_empty, color: Colors.white38, size: 20),
+                      Icon(
+                        Icons.hourglass_empty,
+                        color: Colors.white38,
+                        size: 20,
+                      ),
                     ],
                   ),
                 ),
               ],
 
               // Search section
-              _buildSectionTitle('Rechercher de nouveaux amis'),
+              _buildSectionTitle('Elargir le reseau'),
               TextField(
                 controller: _searchController,
                 style: const TextStyle(color: Colors.white),
@@ -397,7 +448,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                   label: 'Nom / pseudo',
                   prefixIcon: Icons.search,
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.arrow_forward, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.arrow_forward,
+                      color: Colors.white70,
+                    ),
                     onPressed: _doSearch,
                   ),
                 ),
@@ -406,7 +460,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
               const SizedBox(height: 12),
 
               if (_searchResults.isEmpty)
-                Text('Aucun résultat pour le moment.', style: AppTextStyles.body)
+                Text(
+                  'Lance une recherche pour trouver de nouveaux lecteurs.',
+                  style: AppTextStyles.body,
+                )
               else
                 ..._searchResults.map(
                   (f) => _buildFriendCard(
@@ -414,7 +471,10 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                     actions: [
                       IconButton(
                         tooltip: 'Envoyer une demande',
-                        icon: const Icon(Icons.person_add, color: AppColors.success),
+                        icon: const Icon(
+                          Icons.person_add,
+                          color: AppColors.success,
+                        ),
                         onPressed: () => _sendRequest(f),
                       ),
                     ],
@@ -423,6 +483,36 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _summaryCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color tone,
+  }) {
+    return Container(
+      decoration: AppDecorations.sectionCard,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: tone.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: tone, size: 18),
+          ),
+          const SizedBox(height: 14),
+          Text(value, style: AppTextStyles.heading3.copyWith(fontSize: 22)),
+          const SizedBox(height: 4),
+          Text(label, style: AppTextStyles.caption),
+        ],
       ),
     );
   }

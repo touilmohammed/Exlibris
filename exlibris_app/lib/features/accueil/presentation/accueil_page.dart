@@ -1,227 +1,278 @@
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app_router.dart';
-import '../../auth/data/auth_repository.dart';
+import '../../../core/app_components.dart';
+import '../../../core/app_theme.dart';
 import '../../../models/book.dart';
+import '../../../models/exchange.dart';
+import '../../auth/data/auth_repository.dart';
 import '../../books/data/books_providers.dart';
 import '../../books/data/books_repository.dart';
+import '../../exchanges/data/exchanges_providers.dart';
 import '../../friends/data/friends_providers.dart';
-import '../../../models/friend.dart';
+import '../../profile/data/profile_repository.dart';
+import '../../profile/domain/user_profile.dart';
 
 final homeRecommendationsProvider = FutureProvider<List<Book>>((ref) async {
-  final repo = ref.read(booksRepositoryProvider);
-  return repo.searchBooks(query: ""); 
+  try {
+    return await ref.read(booksRepositoryProvider).getRecommendations();
+  } catch (_) {
+    return [];
+  }
 });
 
-/// Page d'accueil principale ExLibris
-/// (feed avec Mes livres, Recommandation IA, Mes amis)
+final homeProfileProvider = FutureProvider<UserProfile>((ref) async {
+  return ref.read(profileRepositoryProvider).getMyProfile();
+});
+
 class AccueilPage extends ConsumerWidget {
   const AccueilPage({super.key});
 
   @override
-  @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final myBooksAsync = ref.watch(collectionProvider);
+    final profileAsync = ref.watch(homeProfileProvider);
+    final collectionAsync = ref.watch(collectionProvider);
     final recommendationsAsync = ref.watch(homeRecommendationsProvider);
+    final exchangesAsync = ref.watch(myExchangesProvider);
     final friendsAsync = ref.watch(friendsListProvider);
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF02191D),
-            Color(0xFF051E24),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      decoration: AppDecorations.pageBackground,
       child: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const _Header(),
-              const SizedBox(height: 24),
-              _SectionCard(
-                title: 'Mes livres',
-                child: myBooksAsync.when(
-                  data: (books) => books.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Text("Aucun livre dans ta collection.", style: TextStyle(color: Colors.white70)),
-                        )
-                      : _BooksCarousel(books: books.take(10).toList()),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          children: [
+            _Header(profileAsync: profileAsync),
+            const SizedBox(height: 18),
+            _PrimaryCard(
+              exchangesAsync: exchangesAsync,
+              collectionAsync: collectionAsync,
+              friendsAsync: friendsAsync,
+            ),
+            const SizedBox(height: 18),
+            _SectionBlock(
+              title: 'Bibliotheque',
+              trailing: collectionAsync.asData?.value.isNotEmpty == true
+                  ? AppCountBadge(
+                      label: '${collectionAsync.asData!.value.length}',
+                    )
+                  : null,
+              child: collectionAsync.when(
+                data: (books) => _BookStrip(
+                  books: books.take(5).toList(),
+                  emptyLabel: 'Ajoute tes premiers livres depuis Explorer.',
                 ),
+                loading: () => const _SectionLoading(),
+                error: (error, _) => _SectionError(message: 'Erreur : $error'),
               ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Recommandation IA',
-                child: recommendationsAsync.when(
-                  data: (books) => books.isEmpty
-                      ? const Text("Aucune recommandation.", style: TextStyle(color: Colors.white70))
-                      : _BooksCarousel(books: books.take(10).toList()),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
+            ),
+            const SizedBox(height: 18),
+            _SectionBlock(
+              title: 'Pour toi',
+              trailing: recommendationsAsync.asData?.value.isNotEmpty == true
+                  ? AppCountBadge(
+                      label: '${recommendationsAsync.asData!.value.length}',
+                      color: AppColors.accent,
+                    )
+                  : null,
+              child: recommendationsAsync.when(
+                data: (books) => _BookStrip(
+                  books: books.take(5).toList(),
+                  emptyLabel: 'Les recommandations apparaitront ici.',
                 ),
+                loading: () => const _SectionLoading(),
+                error: (error, _) => _SectionError(message: 'Erreur : $error'),
               ),
-              const SizedBox(height: 16),
-              _SectionCard(
-                title: 'Mes amis',
-                child: friendsAsync.when(
-                  data: (friends) => friends.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Text("Aucun ami ajouté.", style: TextStyle(color: Colors.white70)),
-                        )
-                      : _FriendsStrip(friends: friends),
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, s) => Text("Erreur: $e", style: const TextStyle(color: Colors.red)),
-                ),
-              ),
-              const SizedBox(height: 32),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// En-tête avec logo/nom de l'app et avatar utilisateur
 class _Header extends ConsumerWidget {
-  const _Header();
+  final AsyncValue<UserProfile> profileAsync;
+
+  const _Header({required this.profileAsync});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ExLibris',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Bienvenue dans ta biblio',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.white.withOpacity(0.7),
-              ),
-            ),
-          ],
-        ),
-        const Spacer(),
-        PopupMenuButton<String>(
-          onSelected: (value) async {
-            if (value == 'logout') {
-              await ref.read(authRepositoryProvider).signOut();
-              if (context.mounted) AppRouter.goSignIn(context);
-            } else if (value == 'profile') {
-              context.push('/profile');
+    final username = profileAsync.asData?.value.nomUtilisateur ?? 'lecteur';
+
+    return AppPageHeader(
+      title: 'Bonjour, $username',
+      subtitle: 'Ton espace du moment',
+      trailing: PopupMenuButton<String>(
+        onSelected: (value) async {
+          if (value == 'logout') {
+            await ref.read(authRepositoryProvider).signOut();
+            if (context.mounted) {
+              AppRouter.goSignIn(context);
             }
-          },
-          color: const Color(0xFF1A3A3A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person, color: Colors.white70, size: 20),
-                  SizedBox(width: 8),
-                  Text('Mon Profil', style: TextStyle(color: Colors.white)),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.white70, size: 20),
-                  SizedBox(width: 8),
-                  Text('Déconnexion', style: TextStyle(color: Colors.white)),
-                ],
-              ),
-            ),
-          ],
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.1),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.5),
-                width: 1.2,
-              ),
-            ),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white70,
-              size: 24,
-            ),
+          } else if (value == 'profile') {
+            context.push('/profile');
+          }
+        },
+        color: const Color(0xFF1A3A3A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        itemBuilder: (context) => const [
+          PopupMenuItem<String>(
+            value: 'profile',
+            child: Text('Mon profil', style: TextStyle(color: Colors.white)),
           ),
-        ),
-      ],
+          PopupMenuItem<String>(
+            value: 'logout',
+            child: Text('Deconnexion', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+        child: const _ProfileMenuTrigger(),
+      ),
     );
   }
 }
 
-/// Carte de section arrondie avec fond sombre/verre
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final Widget child;
+class _ProfileMenuTrigger extends StatelessWidget {
+  const _ProfileMenuTrigger();
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.08),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white),
+    );
+  }
+}
+
+class _PrimaryCard extends StatelessWidget {
+  final AsyncValue<List<Exchange>> exchangesAsync;
+  final AsyncValue<List<Book>> collectionAsync;
+  final AsyncValue<List<dynamic>> friendsAsync;
+
+  const _PrimaryCard({
+    required this.exchangesAsync,
+    required this.collectionAsync,
+    required this.friendsAsync,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.12),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+    final exchanges = exchangesAsync.asData?.value ?? const <Exchange>[];
+    final pending = exchanges
+        .where((exchange) => exchange.statut == 'demande_envoyee')
+        .toList();
+    final collectionCount = collectionAsync.asData?.value.length ?? 0;
+    final friendsCount = friendsAsync.asData?.value.length ?? 0;
+
+    final headline = pending.isNotEmpty
+        ? 'Tu as ${pending.length} echange${pending.length > 1 ? 's' : ''} a suivre'
+        : 'Ta bibliotheque est prete pour les prochains echanges';
+    final detail = pending.isNotEmpty
+        ? (pending.first.livreDemandeurTitre ??
+              pending.first.livreDemandeurIsbn)
+        : '$collectionCount livres dans ta collection · $friendsCount dans ton reseau';
+
+    return AppHeroCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              AppCountBadge(
+                label: pending.isNotEmpty
+                    ? 'En attente'
+                    : 'Bibliotheque active',
               ),
               const Spacer(),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-                color: Colors.white.withOpacity(0.7),
+              const AppIconBadge(icon: Icons.auto_awesome_rounded),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            headline,
+            style: AppTextStyles.heading3.copyWith(fontSize: 22, height: 1.25),
+          ),
+          const SizedBox(height: 8),
+          Text(detail, style: AppTextStyles.body),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniStat(
+                  value: '$collectionCount',
+                  label: 'Collection',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniStat(value: '$friendsCount', label: 'Reseau'),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniStat(value: '${pending.length}', label: 'Echanges'),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _MiniStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: AppTextStyles.heading3),
+          const SizedBox(height: 4),
+          Text(label, style: AppTextStyles.caption),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionBlock extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  const _SectionBlock({
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(title: title, trailing: trailing),
           const SizedBox(height: 12),
           child,
         ],
@@ -230,24 +281,28 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-/// Bandeau horizontal de livres
-class _BooksCarousel extends StatelessWidget {
+class _BookStrip extends StatelessWidget {
   final List<Book> books;
+  final String emptyLabel;
 
-  const _BooksCarousel({required this.books});
+  const _BookStrip({required this.books, required this.emptyLabel});
 
   @override
   Widget build(BuildContext context) {
+    if (books.isEmpty) {
+      return AppSurfaceCard(
+        padding: const EdgeInsets.all(18),
+        child: Text(emptyLabel, style: AppTextStyles.body),
+      );
+    }
+
     return SizedBox(
-      height: 160,
+      height: 208,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: books.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final book = books[index];
-          return _BookCard(book: book);
-        },
+        itemBuilder: (context, index) => _BookCard(book: books[index]),
       ),
     );
   }
@@ -260,115 +315,92 @@ class _BookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 3 / 4,
-      child: InkWell(
-        onTap: () => context.push('/book', extra: book),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: const Color(0xFF1F2933),
-            image: (book.imagePetite != null && book.imagePetite!.isNotEmpty)
-                ? DecorationImage(
-                    image: NetworkImage(book.imagePetite!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.8),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            padding: const EdgeInsets.all(8),
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                book.titre,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+    return GestureDetector(
+      onTap: () => context.push('/book', extra: book),
+      child: SizedBox(
+        width: 118,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFF173137),
                 ),
+                clipBehavior: Clip.antiAlias,
+                child: book.imagePetite != null && book.imagePetite!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: book.imagePetite!,
+                        fit: BoxFit.cover,
+                        httpHeaders: const {
+                          'User-Agent':
+                              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                        },
+                        errorWidget: (_, __, ___) => const _BookPlaceholder(),
+                      )
+                    : const _BookPlaceholder(),
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              book.titre,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.bodyWhite.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              book.auteur,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-
-
-/// Bandeau horizontal Mes Amis
-class _FriendsStrip extends StatelessWidget {
-  final List<Friend> friends;
-
-  const _FriendsStrip({required this.friends});
+class _BookPlaceholder extends StatelessWidget {
+  const _BookPlaceholder();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 90,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: friends.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 16),
-        itemBuilder: (context, index) {
-          final friend = friends[index];
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.white.withOpacity(0.1),
-                    child: Text(
-                      friend.nom.isNotEmpty ? friend.nom[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                friend.nom,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          );
-        },
+    return const Center(
+      child: Icon(Icons.menu_book_rounded, color: Colors.white24),
+    );
+  }
+}
+
+class _SectionLoading extends StatelessWidget {
+  const _SectionLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: CircularProgressIndicator(color: AppColors.success),
       ),
+    );
+  }
+}
+
+class _SectionError extends StatelessWidget {
+  final String message;
+
+  const _SectionError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: AppDecorations.sectionCard,
+      padding: const EdgeInsets.all(18),
+      child: Text(message, style: const TextStyle(color: AppColors.error)),
     );
   }
 }
