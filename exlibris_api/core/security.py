@@ -11,7 +11,7 @@ from core.config import (
     JWT_EXPIRE_MINUTES,
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:

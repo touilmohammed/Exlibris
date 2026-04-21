@@ -6,6 +6,7 @@ import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
+import 'auth_dialogs.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({super.key});
@@ -46,7 +47,18 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         return;
       }
       var errorMsg = 'Identifiants incorrects';
-      if (e.toString().contains('401')) {
+      if (e.toString().contains('403')) {
+        final confirmed = await showEmailConfirmationDialog(
+          context: context,
+          ref: ref,
+          email: _email.text.trim(),
+        );
+        if (confirmed && mounted) {
+           // Re-try sign-in or just tell them it's okay now
+           AppToast.success(context, 'Email confirmé ! Connecte-toi.');
+        }
+        return;
+      } else if (e.toString().contains('401')) {
         errorMsg = 'Email ou mot de passe incorrect';
       } else if (e.toString().contains('timeout') ||
           e.toString().contains('connection')) {

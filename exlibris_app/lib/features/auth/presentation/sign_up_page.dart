@@ -5,6 +5,7 @@ import '../../../app_router.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
+import 'auth_dialogs.dart';
 
 class SignUpPage extends ConsumerStatefulWidget {
   const SignUpPage({super.key});
@@ -48,8 +49,17 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       if (!mounted) {
         return;
       }
-      AppToast.success(context, 'Inscription reussie ! Connecte-toi.');
-      AppRouter.goSignIn(context);
+      
+      final confirmed = await showEmailConfirmationDialog(
+        context: context,
+        ref: ref,
+        email: _email.text.trim(),
+      );
+
+      if (confirmed && mounted) {
+        AppToast.success(context, 'Inscription réussie et email confirmé !');
+        AppRouter.goSignIn(context);
+      }
     } catch (e) {
       if (!mounted) {
         return;
