@@ -42,16 +42,14 @@ def signup(body: SignUpBody):
             INSERT INTO Utilisateur (
                 nom_utilisateur,
                 email,
-                mot_de_passe,
                 mot_de_passe_hash,
                 email_verifie
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s)
             """,
             (
                 body.nom_utilisateur,
                 body.email,
-                "",
                 hashed_password,
                 0,
             ),
