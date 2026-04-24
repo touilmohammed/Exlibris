@@ -34,96 +34,99 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             slivers: [
-              const SliverToBoxAdapter(
-                child: AppPageHeader(
-                  title: 'Bibliothèque',
-                  subtitle: 'Collection et wishlist',
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    const AppPageHeader(
+                      title: 'Bibliothèque',
+                      subtitle: 'Collection et wishlist',
+                    ),
+                    const SizedBox(height: 18),
+                    collectionAsync.when(
+                      data: (collection) => _LibraryOverview(
+                        collectionCount: collection.length,
+                        wishlistCount: wishlist.length,
+                      ),
+                      loading: () => const _LibraryOverview(
+                        collectionCount: 0,
+                        wishlistCount: 0,
+                        loading: true,
+                      ),
+                      error: (_, __) => _LibraryOverview(
+                        collectionCount: 0,
+                        wishlistCount: wishlist.length,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _LibraryTabs(
+                      selectedTab: _selectedTab,
+                      onChanged: (tab) => setState(() => _selectedTab = tab),
+                    ),
+                    const SizedBox(height: 18),
+                  ]),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              SliverToBoxAdapter(
-                child: collectionAsync.when(
-                  data: (collection) => _LibraryOverview(
-                    collectionCount: collection.length,
-                    wishlistCount: wishlist.length,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                sliver: switch (_selectedTab) {
+                  LibraryTab.collection => collectionAsync.when(
+                    data: (books) => _BooksSliver(
+                      books: books,
+                      emptyIcon: Icons.library_books_outlined,
+                      emptyTitle: 'Ta collection est encore vide.',
+                      emptySubtitle: 'Ajoute des livres depuis Explorer.',
+                      actionLabel: 'Retirer',
+                      onAction: (book) async {
+                        await ref
+                            .read(booksRepositoryProvider)
+                            .removeFromCollection(book.isbn);
+                        ref.invalidate(collectionProvider);
+                        if (context.mounted) {
+                          AppToast.info(
+                            context,
+                            'Retiré de la collection : ${book.titre}',
+                          );
+                        }
+                      },
+                    ),
+                    loading: () => const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                    error: (error, _) => SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'Erreur de chargement : $error',
+                          style: const TextStyle(color: AppColors.error),
+                        ),
+                      ),
+                    ),
                   ),
-                  loading: () => const _LibraryOverview(
-                    collectionCount: 0,
-                    wishlistCount: 0,
-                    loading: true,
-                  ),
-                  error: (_, __) => _LibraryOverview(
-                    collectionCount: 0,
-                    wishlistCount: wishlist.length,
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              SliverToBoxAdapter(
-                child: _LibraryTabs(
-                  selectedTab: _selectedTab,
-                  onChanged: (tab) => setState(() => _selectedTab = tab),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              switch (_selectedTab) {
-                LibraryTab.collection => collectionAsync.when(
-                  data: (books) => _BooksSliver(
-                    books: books,
-                    emptyIcon: Icons.library_books_outlined,
-                    emptyTitle: 'Ta collection est encore vide.',
+                  LibraryTab.wishlist => _BooksSliver(
+                    books: wishlist,
+                    emptyIcon: Icons.favorite_border,
+                    emptyTitle: 'Ta wishlist est vide.',
                     emptySubtitle: 'Ajoute des livres depuis Explorer.',
                     actionLabel: 'Retirer',
                     onAction: (book) async {
-                      await ref
-                          .read(booksRepositoryProvider)
-                          .removeFromCollection(book.isbn);
-                      ref.invalidate(collectionProvider);
+                      await ref.read(wishlistProvider.notifier).remove(book);
                       if (context.mounted) {
                         AppToast.info(
                           context,
-                          'Retiré de la collection : ${book.titre}',
+                          'Retiré de la wishlist : ${book.titre}',
                         );
                       }
                     },
                   ),
-                  loading: () => const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ),
-                  error: (error, _) => SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Text(
-                        'Erreur de chargement : $error',
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    ),
-                  ),
-                ),
-                LibraryTab.wishlist => _BooksSliver(
-                  books: wishlist,
-                  emptyIcon: Icons.favorite_border,
-                  emptyTitle: 'Ta wishlist est vide.',
-                  emptySubtitle: 'Ajoute des livres depuis Explorer.',
-                  actionLabel: 'Retirer',
-                  onAction: (book) async {
-                    await ref.read(wishlistProvider.notifier).remove(book);
-                    if (context.mounted) {
-                      AppToast.info(
-                        context,
-                        'Retiré de la wishlist : ${book.titre}',
-                      );
-                    }
-                  },
-                ),
-              },
+                },
+              ),
             ],
           ),
         ),
