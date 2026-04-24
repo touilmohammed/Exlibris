@@ -21,7 +21,7 @@ class PickMyBookPage extends ConsumerWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Proposer un echange'),
+        title: const Text('Proposer un échange'),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
       ),
@@ -36,9 +36,9 @@ class PickMyBookPage extends ConsumerWidget {
                   child: Center(
                     child: AppEmptyStateCard(
                       icon: Icons.library_books_outlined,
-                      title: 'Aucun livre a proposer.',
+                      title: 'Aucun livre à proposer.',
                       subtitle:
-                          'Ajoute des livres dans ta bibliotheque avant de lancer un echange.',
+                          'Ajoute des livres dans ta bibliothèque avant de lancer un échange.',
                     ),
                   ),
                 );
@@ -68,7 +68,7 @@ class PickMyBookPage extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  'Choisis le livre que tu proposes a ${friend.nom}',
+                                  'Choisis le livre que tu proposes à ${friend.nom}',
                                   style: AppTextStyles.heading3.copyWith(
                                     fontSize: 22,
                                   ),

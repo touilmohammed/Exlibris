@@ -8,6 +8,8 @@ class UserProfile {
   final int nbLivresCollection;
   final int nbLivresWishlist;
   final int nbAmis;
+  final String? pgpPublicKey;
+  final String? pgpPrivateKeyEnc;
 
   UserProfile({
     required this.id,
@@ -19,6 +21,8 @@ class UserProfile {
     this.nbLivresCollection = 0,
     this.nbLivresWishlist = 0,
     this.nbAmis = 0,
+    this.pgpPublicKey,
+    this.pgpPrivateKeyEnc,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,8 @@ class UserProfile {
       nbLivresCollection: json['nb_livres_collection'] as int? ?? 0,
       nbLivresWishlist: json['nb_livres_wishlist'] as int? ?? 0,
       nbAmis: json['nb_amis'] as int? ?? 0,
+      pgpPublicKey: json['pgp_public_key'] as String?,
+      pgpPrivateKeyEnc: json['pgp_private_key_enc'] as String?,
     );
   }
 }

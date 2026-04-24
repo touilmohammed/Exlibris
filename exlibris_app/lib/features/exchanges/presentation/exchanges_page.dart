@@ -45,7 +45,7 @@ class _ExchangesPageState extends ConsumerState<ExchangesPage> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
                   const AppPageHeader(
-                    title: 'Echanges',
+                    title: 'Échanges',
                     subtitle: 'Tes propositions et leur statut',
                   ),
                   const SizedBox(height: 18),
@@ -189,7 +189,7 @@ class _ExchangeFilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.cardBorder),
       ),
@@ -207,7 +207,7 @@ class _ExchangeFilterBar extends StatelessWidget {
             onTap: () => onChanged(ExchangeFilter.pending),
           ),
           _FilterButton(
-            label: 'Valides',
+            label: 'Validés',
             selected: selected == ExchangeFilter.completed,
             onTap: () => onChanged(ExchangeFilter.completed),
           ),
@@ -239,7 +239,7 @@ class _FilterButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? AppColors.success.withOpacity(0.18)
+                ? AppColors.success.withValues(alpha: 0.18)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
@@ -264,8 +264,8 @@ class _EmptyExchangeState extends StatelessWidget {
   Widget build(BuildContext context) {
     return const AppEmptyStateCard(
       icon: Icons.swap_horiz_rounded,
-      title: 'Aucun echange a afficher pour le moment.',
-      subtitle: 'Propose un livre depuis ton reseau ou une fiche livre.',
+      title: 'Aucun échange à afficher pour le moment.',
+      subtitle: 'Propose un livre depuis ton réseau ou une fiche livre.',
     );
   }
 }
@@ -302,7 +302,7 @@ class _ExchangeCard extends ConsumerWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.16),
+                  color: statusColor.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -358,10 +358,10 @@ class _ExchangeCard extends ConsumerWidget {
     return switch (status) {
       'demande_envoyee' => ('En attente', AppColors.warning),
       'proposition_confirmee' ||
-      'demande_acceptee' => ('Acceptee', AppColors.success),
+      'demande_acceptee' => ('Acceptée', AppColors.success),
       'demande_refusee' ||
-      'demande_acceptee_refusee' => ('Refusee', AppColors.error),
-      'annulee' || 'annule' => ('Annulee', Colors.white54),
+      'demande_acceptee_refusee' => ('Refusée', AppColors.error),
+      'annulee' || 'annule' => ('Annulée', Colors.white54),
       _ => (status, AppColors.accent),
     };
   }
@@ -409,7 +409,7 @@ class _BookLine extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -449,7 +449,7 @@ class _ExchangeActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (exchange.statut != 'demande_envoyee') {
-      return Text('Statut archive pour suivi.', style: AppTextStyles.caption);
+      return Text('Statut archivé pour suivi.', style: AppTextStyles.caption);
     }
 
     if (isMeSender) {
@@ -458,7 +458,7 @@ class _ExchangeActions extends ConsumerWidget {
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.white70,
-            side: BorderSide(color: Colors.white.withOpacity(0.16)),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
             padding: const EdgeInsets.symmetric(vertical: 14),
           ),
           onPressed: () async {
@@ -468,7 +468,7 @@ class _ExchangeActions extends ConsumerWidget {
                   .cancelExchange(exchange.id);
               ref.invalidate(myExchangesProvider);
               if (context.mounted) {
-                AppToast.success(context, 'Demande annulee');
+                AppToast.success(context, 'Demande annulée');
               }
             } catch (e) {
               if (context.mounted) {
@@ -497,7 +497,7 @@ class _ExchangeActions extends ConsumerWidget {
                     .refuseExchange(exchange.id);
                 ref.invalidate(myExchangesProvider);
                 if (context.mounted) {
-                  AppToast.success(context, 'Demande refusee');
+                  AppToast.success(context, 'Demande refusée');
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -523,7 +523,7 @@ class _ExchangeActions extends ConsumerWidget {
                     .acceptExchange(exchange.id);
                 ref.invalidate(myExchangesProvider);
                 if (context.mounted) {
-                  AppToast.success(context, 'Echange accepte');
+                  AppToast.success(context, 'Echange accepté');
                 }
               } catch (e) {
                 if (context.mounted) {

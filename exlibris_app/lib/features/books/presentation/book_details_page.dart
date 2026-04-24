@@ -72,7 +72,7 @@ class BookDetailsPage extends ConsumerWidget {
                           .read(booksRepositoryProvider)
                           .addToCollection(book.isbn);
                       if (context.mounted) {
-                        AppToast.success(context, 'Ajoute a la collection');
+                        AppToast.success(context, 'Ajouté à la collection');
                       }
                     }
                     ref.invalidate(collectionProvider);
@@ -92,7 +92,7 @@ class BookDetailsPage extends ConsumerWidget {
                   } else {
                     await notifier.add(book);
                     if (context.mounted) {
-                      AppToast.success(context, 'Ajoute a la wishlist');
+                      AppToast.success(context, 'Ajouté à la wishlist');
                     }
                   }
                 },
@@ -334,8 +334,8 @@ class _InfoCard extends StatelessWidget {
           _InfoRow(
             label: 'Etat',
             value: rating != null
-                ? 'Tu as deja note ce livre'
-                : 'Pret a etre ajoute',
+                ? 'Tu as déjà noté ce livre'
+                : 'Prêt à être ajouté',
           ),
           const SizedBox(height: 12),
           _InfoRow(

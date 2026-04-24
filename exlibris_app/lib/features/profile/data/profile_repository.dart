@@ -21,7 +21,6 @@ class ProfileRepository {
   Future<void> updateProfile({
     String? nomUtilisateur,
     String? email,
-    String? motDePasse,
     int? age,
     String? sexe,
     String? pays,
@@ -29,7 +28,6 @@ class ProfileRepository {
     final data = {
       if (nomUtilisateur != null) 'nom_utilisateur': nomUtilisateur,
       if (email != null) 'email': email,
-      if (motDePasse != null) 'mot_de_passe': motDePasse,
       if (age != null) 'age': age,
       if (sexe != null) 'sexe': sexe,
       if (pays != null) 'pays': pays,

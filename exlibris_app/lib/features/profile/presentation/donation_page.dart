@@ -39,7 +39,7 @@ class _DonationPageState extends State<DonationPage> {
     final amount =
         int.tryParse(_amountController.text.trim()) ?? _selectedAmount;
     if (amount <= 0) {
-      AppToast.warning(context, 'Entre un montant valide');
+      AppToast.warning(context, 'Entrez un montant valide');
       return;
     }
 
@@ -63,8 +63,8 @@ class _DonationPageState extends State<DonationPage> {
         AppToast.warning(
           context,
           kIsWeb
-              ? 'Le paiement n est pas encore disponible sur le web.'
-              : 'Le paiement a echoue.',
+              ? 'Le paiement n\'est pas encore disponible sur le web.'
+              : 'Le paiement a échoué.',
         );
       }
     } finally {
@@ -112,7 +112,7 @@ class _DonationPageState extends State<DonationPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Ton don aide ExLibris a continuer de grandir.',
+                        'Votre don aide ExLibris à continuer de grandir.',
                         style: AppTextStyles.body.copyWith(height: 1.5),
                         textAlign: TextAlign.center,
                       ),
@@ -215,12 +215,12 @@ class _DonationPageState extends State<DonationPage> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Aide ExLibris a continuer de grandir',
+                      'Aidez ExLibris à continuer de grandir',
                       style: AppTextStyles.heading2.copyWith(height: 1.2),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Ton don soutient le developpement de l app et les prochaines fonctionnalites.',
+                      'Votre don soutient le développement de l\'app et les prochaines fonctionnalités.',
                       style: AppTextStyles.body.copyWith(height: 1.5),
                     ),
                   ],
@@ -235,23 +235,23 @@ class _DonationPageState extends State<DonationPage> {
                     SizedBox(height: 14),
                     _DonationReason(
                       icon: Icons.auto_awesome_rounded,
-                      title: 'Faire evoluer l application',
+                      title: 'Faire évoluer l\'application',
                       subtitle:
-                          'Soutiens les prochaines ameliorations produit et UX.',
+                          'Soutiens les prochaines améliorations produit et UX.',
                     ),
                     SizedBox(height: 12),
                     _DonationReason(
                       icon: Icons.security_rounded,
-                      title: 'Renforcer l experience',
+                      title: 'Renforcer l\'experience',
                       subtitle:
-                          'Aide a financer une app plus fluide et plus fiable.',
+                          'Aide à financer une app plus fluide et plus fiable.',
                     ),
                     SizedBox(height: 12),
                     _DonationReason(
                       icon: Icons.people_alt_rounded,
-                      title: 'Soutenir la communaute',
+                      title: 'Soutenir la communauté',
                       subtitle:
-                          'Encourage le developpement d une vraie plateforme de lecteurs.',
+                          'Encourage le développement d\'une vraie plateforme de lecteurs.',
                     ),
                   ],
                 ),
@@ -312,7 +312,7 @@ class _DonationPageState extends State<DonationPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Paiement securise via Stripe.',
+                        'Paiement sécurisé via Stripe.',
                         style: AppTextStyles.bodyWhite,
                       ),
                     ),
@@ -422,7 +422,7 @@ class _AmountChip extends StatelessWidget {
           ),
         ),
         child: Text(
-          '$amount ${amount > 1 ? '€' : '€'}',
+          '$amount €',
           style: TextStyle(
             color: selected ? AppColors.warning : Colors.white,
             fontWeight: FontWeight.w600,

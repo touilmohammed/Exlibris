@@ -30,9 +30,23 @@ class AuthRepository {
     );
   }
 
-  /// Confirmation par token (optionnel si votre back le fait)
-  Future<void> confirmEmail({required String token}) async {
-    await _dio.post('/auth/confirm', data: {'token': token});
+  /// Confirmation par code
+  Future<void> confirmEmail({
+    required String email,
+    required String code,
+  }) async {
+    await _dio.post(
+      '/auth/confirm',
+      data: {'email': email, 'code': code},
+    );
+  }
+
+  /// Renvoyer le code de confirmation
+  Future<void> resendConfirmation({required String email}) async {
+    await _dio.post(
+      '/auth/resend-confirmation',
+      data: {'email': email},
+    );
   }
 
   /// Connexion -> enregistre le JWT
@@ -48,4 +62,17 @@ class AuthRepository {
   }
 
   Future<void> signOut() async => TokenStorage.clear();
+
+  Future<void> publishPgpKeys({
+    required String publicKey,
+    required String privateKeyEnc,
+  }) async {
+    await _dio.post(
+      '/auth/pgp',
+      data: {
+        'public_key': publicKey,
+        'private_key_enc': privateKeyEnc,
+      },
+    );
+  }
 }

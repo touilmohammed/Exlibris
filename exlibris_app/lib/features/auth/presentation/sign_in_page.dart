@@ -6,6 +6,9 @@ import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../profile/data/profile_repository.dart';
+import '../../../core/pgp_service.dart';
+import 'auth_dialogs.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({super.key});
@@ -37,6 +40,36 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref
           .read(authRepositoryProvider)
           .signIn(email: _email.text.trim(), password: _password.text);
+          
+      // PGP Key Setup
+      try {
+        final profileRepo = ref.read(profileRepositoryProvider);
+        final pgpService = ref.read(pgpServiceProvider);
+        
+        final profile = await profileRepo.getMyProfile();
+        
+        if (profile.pgpPublicKey != null && profile.pgpPrivateKeyEnc != null) {
+          // Utilise les clés du serveur pour restaurer localement
+          final decryptedPrivKey = await pgpService.decryptPrivateKeyWithPassword(
+            profile.pgpPrivateKeyEnc!, _password.text
+          );
+          await pgpService.savePrivateKeyLocal(decryptedPrivKey);
+          await pgpService.savePublicKeyLocal(profile.pgpPublicKey!);
+        } else {
+          // Génère de nouvelles clés et sauvegarde sur le serveur
+          final keyPair = await pgpService.generateKeyPair(profile.nomUtilisateur, profile.email);
+          final encryptedPrivKey = await pgpService.encryptPrivateKeyWithPassword(
+              keyPair.privateKey, _password.text);
+              
+          await ref.read(authRepositoryProvider).publishPgpKeys(
+              publicKey: keyPair.publicKey,
+              privateKeyEnc: encryptedPrivKey,
+          );
+        }
+      } catch (e) {
+        debugPrint('Erreur PGP: $e');
+      }
+
       if (!mounted) {
         return;
       }
@@ -46,7 +79,18 @@ class _SignInPageState extends ConsumerState<SignInPage> {
         return;
       }
       var errorMsg = 'Identifiants incorrects';
-      if (e.toString().contains('401')) {
+      if (e.toString().contains('403')) {
+        final confirmed = await showEmailConfirmationDialog(
+          context: context,
+          ref: ref,
+          email: _email.text.trim(),
+        );
+        if (confirmed && mounted) {
+           // Re-try sign-in or just tell them it's okay now
+           AppToast.success(context, 'Email confirmé ! Connecte-toi.');
+        }
+        return;
+      } else if (e.toString().contains('401')) {
         errorMsg = 'Email ou mot de passe incorrect';
       } else if (e.toString().contains('timeout') ||
           e.toString().contains('connection')) {
@@ -75,7 +119,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   children: [
                     const _SimpleAuthHeader(
                       title: 'Connexion',
-                      subtitle: 'Retrouve ta bibliotheque et tes echanges.',
+                      subtitle: 'Retrouve ta bibliothèque et tes échanges.',
                       icon: Icons.menu_book_rounded,
                     ),
                     const SizedBox(height: 18),

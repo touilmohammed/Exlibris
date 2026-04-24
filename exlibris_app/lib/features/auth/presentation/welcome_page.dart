@@ -46,7 +46,7 @@ class WelcomePage extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Ta bibliotheque sociale pour decouvrir, partager et echanger des livres.',
+                        'Ta bibliothèque sociale pour découvrir, partager et échanger des livres.',
                         style: AppTextStyles.body.copyWith(height: 1.5),
                       ),
                       const SizedBox(height: 20),
@@ -56,7 +56,7 @@ class WelcomePage extends StatelessWidget {
                         children: const [
                           AppCountBadge(label: 'Collection'),
                           AppCountBadge(
-                            label: 'Echanges',
+                            label: 'Échanges',
                             color: AppColors.accent,
                           ),
                           AppCountBadge(
@@ -83,9 +83,9 @@ class WelcomePage extends StatelessWidget {
                       SizedBox(height: 14),
                       _FeatureRow(
                         icon: Icons.swap_horiz_rounded,
-                        title: 'Propose des echanges',
+                        title: 'Propose des échanges',
                         subtitle:
-                            'Lance des propositions simplement avec ton reseau.',
+                            'Lance des propositions simplement avec ton réseau.',
                       ),
                       SizedBox(height: 14),
                       _FeatureRow(

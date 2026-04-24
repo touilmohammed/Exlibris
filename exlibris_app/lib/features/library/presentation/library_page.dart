@@ -39,7 +39,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const AppPageHeader(
-                title: 'Bibliotheque',
+                title: 'Bibliothèque',
                 subtitle: 'Collection et wishlist',
               ),
               const SizedBox(height: 18),
@@ -81,7 +81,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                         if (context.mounted) {
                           AppToast.info(
                             context,
-                            'Retire de la collection : ${book.titre}',
+                            'Retiré de la collection : ${book.titre}',
                           );
                         }
                       },
@@ -102,14 +102,14 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                     books: wishlist,
                     emptyIcon: Icons.favorite_border,
                     emptyTitle: 'Ta wishlist est vide.',
-                    emptySubtitle: 'Ajoute des livres a suivre.',
+                    emptySubtitle: 'Ajoute des livres depuis Explorer.',
                     actionLabel: 'Retirer',
                     onAction: (book) async {
                       await ref.read(wishlistProvider.notifier).remove(book);
                       if (context.mounted) {
                         AppToast.info(
                           context,
-                          'Retire de la wishlist : ${book.titre}',
+                          'Retiré de la wishlist : ${book.titre}',
                         );
                       }
                     },
@@ -205,7 +205,7 @@ class _LibraryTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.cardBorder),
       ),
@@ -258,12 +258,12 @@ class _TabButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: selected
-              ? AppColors.success.withOpacity(0.18)
+              ? AppColors.success.withValues(alpha: 0.18)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected
-                ? AppColors.success.withOpacity(0.4)
+                ? AppColors.success.withValues(alpha: 0.4)
                 : Colors.transparent,
           ),
         ),
@@ -454,7 +454,7 @@ class _BookPlaceholder extends StatelessWidget {
     return Center(
       child: Icon(
         Icons.menu_book_rounded,
-        color: Colors.white.withOpacity(0.35),
+        color: Colors.white.withValues(alpha: 0.35),
         size: 38,
       ),
     );
