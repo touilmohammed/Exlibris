@@ -27,13 +27,15 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final collectionAsync = ref.watch(collectionProvider);
     final wishlist = ref.watch(wishlistProvider);
 
-    return Container(
-      decoration: AppDecorations.pageBackground,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-          child: Column(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: AppDecorations.pageBackground,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const AppPageHeader(
@@ -118,8 +120,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _LibraryOverview extends StatelessWidget {
