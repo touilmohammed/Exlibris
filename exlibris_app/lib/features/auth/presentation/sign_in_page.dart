@@ -40,40 +40,50 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref
           .read(authRepositoryProvider)
           .signIn(email: _email.text.trim(), password: _password.text);
-          
-      // PGP Key Setup
-      try {
-        final profileRepo = ref.read(profileRepositoryProvider);
-        final pgpService = ref.read(pgpServiceProvider);
-        
-        final profile = await profileRepo.getMyProfile();
-        
-        if (profile.pgpPublicKey != null && profile.pgpPrivateKeyEnc != null) {
-          // Utilise les clés du serveur pour restaurer localement
-          final decryptedPrivKey = await pgpService.decryptPrivateKeyWithPassword(
-            profile.pgpPrivateKeyEnc!, _password.text
-          );
-          await pgpService.savePrivateKeyLocal(decryptedPrivKey);
-          await pgpService.savePublicKeyLocal(profile.pgpPublicKey!);
-        } else {
-          // Génère de nouvelles clés et sauvegarde sur le serveur
-          final keyPair = await pgpService.generateKeyPair(profile.nomUtilisateur, profile.email);
-          final encryptedPrivKey = await pgpService.encryptPrivateKeyWithPassword(
-              keyPair.privateKey, _password.text);
-              
-          await ref.read(authRepositoryProvider).publishPgpKeys(
-              publicKey: keyPair.publicKey,
-              privateKeyEnc: encryptedPrivKey,
-          );
-        }
-      } catch (e) {
-        debugPrint('Erreur PGP: $e');
-      }
 
       if (!mounted) {
         return;
       }
       AppRouter.goHome(context);
+
+      try {
+        // PGP Key Setup
+        final profileRepo = ref.read(profileRepositoryProvider);
+        final pgpService = ref.read(pgpServiceProvider);
+
+        final profile = await profileRepo.getMyProfile();
+
+        if (profile.pgpPublicKey != null && profile.pgpPrivateKeyEnc != null) {
+          // Utilise les clés du serveur pour restaurer localement
+          final decryptedPrivKey = await pgpService
+              .decryptPrivateKeyWithPassword(
+                profile.pgpPrivateKeyEnc!,
+                _password.text,
+              );
+          await pgpService.savePrivateKeyLocal(decryptedPrivKey);
+          await pgpService.savePublicKeyLocal(profile.pgpPublicKey!);
+        } else {
+          // Génère de nouvelles clés et sauvegarde sur le serveur
+          final keyPair = await pgpService.generateKeyPair(
+            profile.nomUtilisateur,
+            profile.email,
+          );
+          final encryptedPrivKey = await pgpService
+              .encryptPrivateKeyWithPassword(
+                keyPair.privateKey,
+                _password.text,
+              );
+
+          await ref
+              .read(authRepositoryProvider)
+              .publishPgpKeys(
+                publicKey: keyPair.publicKey,
+                privateKeyEnc: encryptedPrivKey,
+              );
+        }
+      } catch (e) {
+        debugPrint('Erreur PGP: $e');
+      }
     } catch (e) {
       if (!mounted) {
         return;
@@ -86,8 +96,8 @@ class _SignInPageState extends ConsumerState<SignInPage> {
           email: _email.text.trim(),
         );
         if (confirmed && mounted) {
-           // Re-try sign-in or just tell them it's okay now
-           AppToast.success(context, 'Email confirmé ! Connecte-toi.');
+          // Re-try sign-in or just tell them it's okay now
+          AppToast.success(context, 'Email confirmé ! Connecte-toi.');
         }
         return;
       } else if (e.toString().contains('401')) {
@@ -194,7 +204,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                     TextButton(
                       onPressed: () => AppRouter.goSignUp(context),
                       child: const Text(
-                        'Pas encore de compte ? Creer un compte',
+                        'Pas encore de compte ? Créer un compte',
                         style: TextStyle(color: Colors.white70),
                       ),
                     ),

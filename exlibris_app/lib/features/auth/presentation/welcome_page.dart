@@ -110,7 +110,7 @@ class WelcomePage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    child: const Text("Creer un compte"),
+                    child: const Text("Créer un compte"),
                   ),
                 ),
                 const SizedBox(height: 10),

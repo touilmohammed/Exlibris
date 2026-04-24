@@ -19,13 +19,7 @@ API_BASE_URL=http://87.106.141.247/exlibris-api
 
 ### Lancer les tests
 
-```bash
-flutter test
-```
-
-## Pour aller sur php my admin sur le back
-
-http://87.106.141.247/phpmyadmin
-
-user: exlibris
-mdp: exlibris2b
+## FRONT
+1. dans le .env.local, ajouter l'adresse de l'API
+2. flutter pub get
+3. flutter run
