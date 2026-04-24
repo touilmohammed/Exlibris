@@ -1,6 +1,6 @@
 class Exchange {
   final int id;
-  final int expediteurId;
+  final int? expediteurId;
   final int? destinataireId;
   final String livreDemandeurIsbn;
   final String? livreDemandeurTitre;
@@ -23,15 +23,17 @@ class Exchange {
 
   factory Exchange.fromJson(Map<String, dynamic> json) {
     return Exchange(
-      id: json['id_demande'] as int,
-      expediteurId: json['expediteur_id'] as int,
+      id: json['id_echange'] as int,
+      expediteurId: json['demandeur_id'] as int?,
       destinataireId: json['destinataire_id'] as int?,
       livreDemandeurIsbn: json['livre_demandeur_isbn'] as String,
       livreDemandeurTitre: json['livre_demandeur_titre'] as String?,
       livreDestinataireIsbn: json['livre_destinataire_isbn'] as String,
       livreDestinataireTitre: json['livre_destinataire_titre'] as String?,
       statut: json['statut'] as String,
-      dateEchange: DateTime.parse(json['date_echange'] as String),
+      dateEchange: json['date_creation'] != null
+          ? DateTime.parse(json['date_creation'] as String)
+          : DateTime.now(),
     );
   }
 }

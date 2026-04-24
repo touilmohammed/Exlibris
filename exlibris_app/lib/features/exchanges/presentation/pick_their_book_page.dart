@@ -248,7 +248,7 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
               ),
               if (_submitting)
                 Container(
-                  color: Colors.black.withOpacity(0.35),
+                  color: Colors.black.withValues(alpha: 0.35),
                   child: const Center(
                     child: CircularProgressIndicator(color: AppColors.success),
                   ),
