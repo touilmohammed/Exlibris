@@ -1,3 +1,4 @@
+from fastapi import Depends
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -11,7 +12,8 @@ from core.security import (
 )
 from core.config import EMAIL_CONFIRMATION_EXPIRE_MINUTES
 from services.email_service import send_confirmation_email
-from schemas.auth import SignUpBody, LoginBody, ConfirmBody, ResendConfirmationBody
+from schemas.auth import SignUpBody, LoginBody, ConfirmBody, ResendConfirmationBody, PublishPgpBody
+from dependencies.auth import get_current_user_id
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -276,3 +278,25 @@ def resend_confirmation(body: ResendConfirmationBody):
         conn.close()
 
     return {"ok": True, "message": "Code renvoyé"}
+
+@router.post("/pgp")
+def publish_pgp(body: PublishPgpBody, current_user_id: int = Depends(get_current_user_id)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE Utilisateur
+            SET pgp_public_key = %s, pgp_private_key_enc = %s
+            WHERE id_utilisateur = %s
+            """,
+            (body.public_key, body.private_key_enc, current_user_id),
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
+    finally:
+        conn.close()
+
+    return {"ok": True, "message": "Clés PGP sauvegardées"}

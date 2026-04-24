@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart'; // Add import
+import 'package:go_router/go_router.dart';
 
 import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
@@ -233,7 +233,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.2),
+                color: AppColors.success.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -345,7 +345,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.2),
+                      color: AppColors.error.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -390,6 +390,23 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                   (f) => _buildFriendCard(
                     f,
                     actions: [
+                      IconButton(
+                        tooltip: 'Discuter',
+                        icon: Badge(
+                          isLabelVisible: f.unreadMessages > 0,
+                          label: Text('${f.unreadMessages}'),
+                          backgroundColor: AppColors.backgroundDark,
+                          textColor: Colors.white,
+                          child: const Icon(
+                            Icons.chat,
+                            color: Colors.white54,
+                            size: 20,
+                          ),
+                        ),
+                        onPressed: () => context
+                            .push('/chat', extra: f)
+                            .then((_) => _loadAll()),
+                      ),
                       IconButton(
                         tooltip: 'Suggérer un livre',
                         icon: const Icon(
@@ -503,7 +520,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: tone.withOpacity(0.18),
+              color: tone.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: tone, size: 18),

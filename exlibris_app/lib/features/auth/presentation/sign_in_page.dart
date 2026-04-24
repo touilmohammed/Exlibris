@@ -6,6 +6,8 @@ import '../../../core/app_components.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../profile/data/profile_repository.dart';
+import '../../../core/pgp_service.dart';
 import 'auth_dialogs.dart';
 
 class SignInPage extends ConsumerStatefulWidget {
@@ -38,6 +40,36 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       await ref
           .read(authRepositoryProvider)
           .signIn(email: _email.text.trim(), password: _password.text);
+          
+      // PGP Key Setup
+      try {
+        final profileRepo = ref.read(profileRepositoryProvider);
+        final pgpService = ref.read(pgpServiceProvider);
+        
+        final profile = await profileRepo.getMyProfile();
+        
+        if (profile.pgpPublicKey != null && profile.pgpPrivateKeyEnc != null) {
+          // Utilise les clés du serveur pour restaurer localement
+          final decryptedPrivKey = await pgpService.decryptPrivateKeyWithPassword(
+            profile.pgpPrivateKeyEnc!, _password.text
+          );
+          await pgpService.savePrivateKeyLocal(decryptedPrivKey);
+          await pgpService.savePublicKeyLocal(profile.pgpPublicKey!);
+        } else {
+          // Génère de nouvelles clés et sauvegarde sur le serveur
+          final keyPair = await pgpService.generateKeyPair(profile.nomUtilisateur, profile.email);
+          final encryptedPrivKey = await pgpService.encryptPrivateKeyWithPassword(
+              keyPair.privateKey, _password.text);
+              
+          await ref.read(authRepositoryProvider).publishPgpKeys(
+              publicKey: keyPair.publicKey,
+              privateKeyEnc: encryptedPrivKey,
+          );
+        }
+      } catch (e) {
+        debugPrint('Erreur PGP: $e');
+      }
+
       if (!mounted) {
         return;
       }

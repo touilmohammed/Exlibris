@@ -11,6 +11,7 @@ import 'features/books/presentation/book_details_page.dart';
 import 'features/exchanges/presentation/pick_my_book_page.dart';
 import 'features/exchanges/presentation/pick_their_book_page.dart';
 import 'features/exchanges/presentation/exchanges_page.dart';
+import 'features/friends/presentation/messages_page.dart';
 import 'models/book.dart';
 import 'models/friend.dart';
 import 'core/token_storage.dart';
@@ -65,6 +66,13 @@ class AppRouter {
       GoRoute(
         path: '/my-exchanges',
         builder: (context, state) => const ExchangesPage(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) {
+          final friend = state.extra as Friend;
+          return MessagesPage(friend: friend);
+        },
       ),
     ],
   );

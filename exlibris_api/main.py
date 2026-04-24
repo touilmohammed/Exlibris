@@ -15,6 +15,7 @@ from routers.auth import router as auth_router
 from routers.exchanges import router as exchanges_router
 from routers.payments import router as payments_router
 from routers.stripe import router as stripe_router
+from routers.messages import router as messages_router
 from contextlib import asynccontextmanager
 
 ML_PIPELINE = None
@@ -82,6 +83,8 @@ class UserProfile(BaseModel):
     nb_livres_collection: int = 0
     nb_livres_wishlist: int = 0
     nb_amis: int = 0
+    pgp_public_key: Optional[str] = None
+    pgp_private_key_enc: Optional[str] = None
 
 
 class Book(BaseModel):
@@ -268,7 +271,7 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
     try:
         # Infos user
         cur.execute(
-            "SELECT id_utilisateur, nom_utilisateur, email FROM Utilisateur WHERE id_utilisateur = %s",
+            "SELECT id_utilisateur, nom_utilisateur, email, pgp_public_key, pgp_private_key_enc FROM Utilisateur WHERE id_utilisateur = %s",
             (current_user_id,)
         )
         row = cur.fetchone()
@@ -302,7 +305,9 @@ def get_my_profile(current_user_id: int = Depends(get_current_user_id)):
         avatar_url=None,
         nb_livres_collection=nb_col,
         nb_livres_wishlist=nb_wish,
-        nb_amis=nb_amis
+        nb_amis=nb_amis,
+        pgp_public_key=row[3],
+        pgp_private_key_enc=row[4]
     )
 
 
@@ -702,6 +707,8 @@ class Friend(BaseModel):
     id: int
     nom: str
     avatar_url: Optional[str] = None
+    unread_messages: int = 0
+    pgp_public_key: Optional[str] = None
 
 
 @app.get("/friends", response_model=List[Friend])
@@ -711,7 +718,13 @@ def get_friends(current_user_id: int = Depends(get_current_user_id)):
     cur = conn.cursor()
     try:
         sql = """
-            SELECT u.id_utilisateur, u.nom_utilisateur
+            SELECT u.id_utilisateur, u.nom_utilisateur,
+                   (SELECT COUNT(*) FROM Message m 
+                    WHERE m.expediteur_id = u.id_utilisateur 
+                      AND m.destinataire_id = %s 
+                      AND m.lu = FALSE) as unread,
+                   u.pgp_public_key
+
             FROM Amitie a
             JOIN Utilisateur u ON (
                 (a.utilisateur_1_id = %s AND a.utilisateur_2_id = u.id_utilisateur)
@@ -719,13 +732,13 @@ def get_friends(current_user_id: int = Depends(get_current_user_id)):
             )
             WHERE a.statut = 'accepte'
         """
-        cur.execute(sql, (current_user_id, current_user_id))
+        cur.execute(sql, (current_user_id, current_user_id, current_user_id))
         rows = cur.fetchall()
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
     conn.close()
-    return [Friend(id=row[0], nom=row[1]) for row in rows]
+    return [Friend(id=row[0], nom=row[1], unread_messages=row[2], pgp_public_key=row[3]) for row in rows]
 
 
 @app.get("/friends/requests", response_model=List[Friend])
@@ -1046,3 +1059,4 @@ app.include_router(auth_router)
 app.include_router(exchanges_router)
 app.include_router(payments_router)
 app.include_router(stripe_router)
+app.include_router(messages_router)

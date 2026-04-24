@@ -19,3 +19,7 @@ class ConfirmBody(BaseModel):
 
 class ResendConfirmationBody(BaseModel):
     email: EmailStr
+
+class PublishPgpBody(BaseModel):
+    public_key: str
+    private_key_enc: str

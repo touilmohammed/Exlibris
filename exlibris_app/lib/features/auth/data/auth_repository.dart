@@ -62,4 +62,17 @@ class AuthRepository {
   }
 
   Future<void> signOut() async => TokenStorage.clear();
+
+  Future<void> publishPgpKeys({
+    required String publicKey,
+    required String privateKeyEnc,
+  }) async {
+    await _dio.post(
+      '/auth/pgp',
+      data: {
+        'public_key': publicKey,
+        'private_key_enc': privateKeyEnc,
+      },
+    );
+  }
 }
