@@ -102,10 +102,6 @@ class _DecidePageState extends State<_DecidePage> {
   }
 
   Future<void> _check() async {
-    // Effacer l'ancien token pour forcer une nouvelle connexion
-    // TODO: Supprimer cette ligne après le premier test réussi
-    await TokenStorage.clear();
-
     final token = await TokenStorage.read();
     if (!mounted) return;
     if (token == null) {

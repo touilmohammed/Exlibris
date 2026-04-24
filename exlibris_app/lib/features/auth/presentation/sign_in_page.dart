@@ -41,8 +41,13 @@ class _SignInPageState extends ConsumerState<SignInPage> {
           .read(authRepositoryProvider)
           .signIn(email: _email.text.trim(), password: _password.text);
 
-      // PGP Key Setup
+      if (!mounted) {
+        return;
+      }
+      AppRouter.goHome(context);
+
       try {
+        // PGP Key Setup
         final profileRepo = ref.read(profileRepositoryProvider);
         final pgpService = ref.read(pgpServiceProvider);
 
@@ -79,11 +84,6 @@ class _SignInPageState extends ConsumerState<SignInPage> {
       } catch (e) {
         debugPrint('Erreur PGP: $e');
       }
-
-      if (!mounted) {
-        return;
-      }
-      AppRouter.goHome(context);
     } catch (e) {
       if (!mounted) {
         return;
