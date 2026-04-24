@@ -49,7 +49,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       if (!mounted) {
         return;
       }
-      
+
       final confirmed = await showEmailConfirmationDialog(
         context: context,
         ref: ref,
@@ -64,9 +64,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       if (!mounted) {
         return;
       }
-      var errorMsg = 'Echec de l inscription';
+      var errorMsg = 'Échec de l\'inscription';
       if (e.toString().contains('409')) {
-        errorMsg = 'Cet email est deja utilise';
+        errorMsg = 'Cet email est déjà utilisé';
       } else if (e.toString().contains('timeout') ||
           e.toString().contains('connection')) {
         errorMsg = 'Impossible de se connecter au serveur';
@@ -93,7 +93,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                 child: Column(
                   children: [
                     const _SimpleAuthHeader(
-                      title: 'Creer un compte',
+                      title: 'Créer un compte',
                       subtitle:
                           'Commence à construire ta bibliothèque sociale.',
                       icon: Icons.auto_stories_rounded,
@@ -108,7 +108,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                             controller: _username,
                             style: const TextStyle(color: Colors.white),
                             decoration: AppDecorations.inputDecoration(
-                              label: 'Nom d utilisateur',
+                              label: 'Nom d\'utilisateur',
                               prefixIcon: Icons.person_outline,
                             ),
                             validator: (value) {
@@ -211,8 +211,8 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                               ),
                               child: Text(
                                 _loading
-                                    ? 'Creation du compte...'
-                                    : 'Creer mon compte',
+                                    ? 'Création du compte...'
+                                    : 'Créer mon compte',
                               ),
                             ),
                           ),

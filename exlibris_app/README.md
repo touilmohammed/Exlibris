@@ -19,14 +19,6 @@ samples, guidance on mobile development, and a full API reference.
 # Info 
 
 ## FRONT
-1. dans le .env.loca ajouter: 
-API_BASE_URL=http://87.106.141.247/exlibris-api
-3. flutter pub get
-4. flutter run
-
-## Pour aller sur php my admin sur le back
-
-http://87.106.141.247/phpmyadmin
-
-user: exlibris
-mdp: exlibris2b
+1. dans le .env.local, ajouter l'adresse de l'API
+2. flutter pub get
+3. flutter run
