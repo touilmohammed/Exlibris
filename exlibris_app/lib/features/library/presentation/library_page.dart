@@ -33,96 +33,103 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         decoration: AppDecorations.pageBackground,
         child: SafeArea(
           bottom: false,
-          child: Padding(
+          child: CustomScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AppPageHeader(
-                title: 'Bibliothèque',
-                subtitle: 'Collection et wishlist',
-              ),
-              const SizedBox(height: 18),
-              collectionAsync.when(
-                data: (collection) => _LibraryOverview(
-                  collectionCount: collection.length,
-                  wishlistCount: wishlist.length,
-                ),
-                loading: () => const _LibraryOverview(
-                  collectionCount: 0,
-                  wishlistCount: 0,
-                  loading: true,
-                ),
-                error: (_, __) => _LibraryOverview(
-                  collectionCount: 0,
-                  wishlistCount: wishlist.length,
+            slivers: [
+              const SliverToBoxAdapter(
+                child: AppPageHeader(
+                  title: 'Bibliothèque',
+                  subtitle: 'Collection et wishlist',
                 ),
               ),
-              const SizedBox(height: 18),
-              _LibraryTabs(
-                selectedTab: _selectedTab,
-                onChanged: (tab) => setState(() => _selectedTab = tab),
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              SliverToBoxAdapter(
+                child: collectionAsync.when(
+                  data: (collection) => _LibraryOverview(
+                    collectionCount: collection.length,
+                    wishlistCount: wishlist.length,
+                  ),
+                  loading: () => const _LibraryOverview(
+                    collectionCount: 0,
+                    wishlistCount: 0,
+                    loading: true,
+                  ),
+                  error: (_, __) => _LibraryOverview(
+                    collectionCount: 0,
+                    wishlistCount: wishlist.length,
+                  ),
+                ),
               ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: switch (_selectedTab) {
-                  LibraryTab.collection => collectionAsync.when(
-                    data: (books) => _BooksGrid(
-                      books: books,
-                      emptyIcon: Icons.library_books_outlined,
-                      emptyTitle: 'Ta collection est encore vide.',
-                      emptySubtitle: 'Ajoute des livres depuis Explorer.',
-                      actionLabel: 'Retirer',
-                      onAction: (book) async {
-                        await ref
-                            .read(booksRepositoryProvider)
-                            .removeFromCollection(book.isbn);
-                        ref.invalidate(collectionProvider);
-                        if (context.mounted) {
-                          AppToast.info(
-                            context,
-                            'Retiré de la collection : ${book.titre}',
-                          );
-                        }
-                      },
-                    ),
-                    loading: () => const Center(
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              SliverToBoxAdapter(
+                child: _LibraryTabs(
+                  selectedTab: _selectedTab,
+                  onChanged: (tab) => setState(() => _selectedTab = tab),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              switch (_selectedTab) {
+                LibraryTab.collection => collectionAsync.when(
+                  data: (books) => _BooksSliver(
+                    books: books,
+                    emptyIcon: Icons.library_books_outlined,
+                    emptyTitle: 'Ta collection est encore vide.',
+                    emptySubtitle: 'Ajoute des livres depuis Explorer.',
+                    actionLabel: 'Retirer',
+                    onAction: (book) async {
+                      await ref
+                          .read(booksRepositoryProvider)
+                          .removeFromCollection(book.isbn);
+                      ref.invalidate(collectionProvider);
+                      if (context.mounted) {
+                        AppToast.info(
+                          context,
+                          'Retiré de la collection : ${book.titre}',
+                        );
+                      }
+                    },
+                  ),
+                  loading: () => const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: CircularProgressIndicator(
                         color: AppColors.success,
                       ),
                     ),
-                    error: (error, _) => Center(
+                  ),
+                  error: (error, _) => SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: Text(
                         'Erreur de chargement : $error',
                         style: const TextStyle(color: AppColors.error),
                       ),
                     ),
                   ),
-                  LibraryTab.wishlist => _BooksGrid(
-                    books: wishlist,
-                    emptyIcon: Icons.favorite_border,
-                    emptyTitle: 'Ta wishlist est vide.',
-                    emptySubtitle: 'Ajoute des livres depuis Explorer.',
-                    actionLabel: 'Retirer',
-                    onAction: (book) async {
-                      await ref.read(wishlistProvider.notifier).remove(book);
-                      if (context.mounted) {
-                        AppToast.info(
-                          context,
-                          'Retiré de la wishlist : ${book.titre}',
-                        );
-                      }
-                    },
-                  ),
-                },
-              ),
+                ),
+                LibraryTab.wishlist => _BooksSliver(
+                  books: wishlist,
+                  emptyIcon: Icons.favorite_border,
+                  emptyTitle: 'Ta wishlist est vide.',
+                  emptySubtitle: 'Ajoute des livres depuis Explorer.',
+                  actionLabel: 'Retirer',
+                  onAction: (book) async {
+                    await ref.read(wishlistProvider.notifier).remove(book);
+                    if (context.mounted) {
+                      AppToast.info(
+                        context,
+                        'Retiré de la wishlist : ${book.titre}',
+                      );
+                    }
+                  },
+                ),
+              },
             ],
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _LibraryOverview extends StatelessWidget {
@@ -290,7 +297,7 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _BooksGrid extends StatelessWidget {
+class _BooksSliver extends StatelessWidget {
   final List<Book> books;
   final IconData emptyIcon;
   final String emptyTitle;
@@ -298,7 +305,7 @@ class _BooksGrid extends StatelessWidget {
   final String actionLabel;
   final Future<void> Function(Book book) onAction;
 
-  const _BooksGrid({
+  const _BooksSliver({
     required this.books,
     required this.emptyIcon,
     required this.emptyTitle,
@@ -310,31 +317,33 @@ class _BooksGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (books.isEmpty) {
-      return Center(
-        child: AppEmptyStateCard(
-          icon: emptyIcon,
-          title: emptyTitle,
-          subtitle: emptySubtitle,
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: AppEmptyStateCard(
+            icon: emptyIcon,
+            title: emptyTitle,
+            subtitle: emptySubtitle,
+          ),
         ),
       );
     }
 
-    return GridView.builder(
+    return SliverGrid(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.72,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
-      itemCount: books.length,
-      itemBuilder: (context, index) {
+      delegate: SliverChildBuilderDelegate((context, index) {
         final book = books[index];
         return _BookCard(
           book: book,
           actionLabel: actionLabel,
           onAction: () => onAction(book),
         );
-      },
+      }, childCount: books.length),
     );
   }
 }
