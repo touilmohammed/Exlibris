@@ -258,24 +258,44 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: AppDecorations.cardDecoration,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.gradientEnd,
-          child: Text(
-            f.nom.isNotEmpty ? f.nom[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppColors.gradientEnd,
+            child: Text(
+              f.nom.isNotEmpty ? f.nom[0].toUpperCase() : '?',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-        ),
-        title: Text(f.nom, style: AppTextStyles.bodyWhite),
-        subtitle: subtitle != null
-            ? Text(subtitle, style: AppTextStyles.caption)
-            : null,
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(f.nom, style: AppTextStyles.bodyWhite),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: AppTextStyles.caption),
+                ],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: actions,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
