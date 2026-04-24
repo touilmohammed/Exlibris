@@ -240,7 +240,13 @@ class _GlassNavItem extends StatelessWidget {
                       : Colors.white.withValues(alpha: 0.62),
                   letterSpacing: isActive ? 0.1 : 0,
                 ),
-                child: Text(label),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                  ),
+                ),
               ),
             ],
           ),
