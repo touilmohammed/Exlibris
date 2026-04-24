@@ -149,7 +149,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
       setState(() {
         _friends.removeWhere((f) => f.id == friend.id);
       });
-      AppToast.info(context, 'Ami supprime');
+      AppToast.info(context, 'Ami supprimé');
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Erreur : $e');
@@ -294,7 +294,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
               const AppPageHeader(
-                title: 'Reseau',
+                title: 'Réseau',
                 subtitle: 'Tes amis et tes demandes',
               ),
               const SizedBox(height: 18),
@@ -322,7 +322,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
                     child: _summaryCard(
                       icon: Icons.outbox_rounded,
                       value: '${_outgoing.length}',
-                      label: 'Envoyees',
+                      label: 'Envoyées',
                       tone: AppColors.success,
                     ),
                   ),
@@ -457,7 +457,7 @@ class _FriendsPageState extends ConsumerState<FriendsPage> {
               ],
 
               // Search section
-              _buildSectionTitle('Elargir le reseau'),
+              _buildSectionTitle('Élargir le réseau'),
               TextField(
                 controller: _searchController,
                 style: const TextStyle(color: Colors.white),

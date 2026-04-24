@@ -89,7 +89,7 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
         return;
       }
 
-      AppToast.success(context, 'Echange propose avec succes');
+      AppToast.success(context, 'Échange proposé avec succès');
       context.go('/home');
     } catch (e) {
       if (!mounted) {
@@ -112,7 +112,7 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Proposer un echange'),
+        title: const Text('Proposer un échange'),
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
       ),
@@ -130,9 +130,9 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
                         child: AppEmptyStateCard(
                           icon: Icons.inventory_2_outlined,
                           title:
-                              '${widget.friend.nom} n a aucun livre a proposer.',
+                              '${widget.friend.nom} n\'a aucun livre à proposer.',
                           subtitle:
-                              'Tu pourras lancer un echange quand sa collection sera remplie.',
+                              'Tu pourras lancer un échange quand sa collection sera remplie.',
                         ),
                       ),
                     );
@@ -168,7 +168,7 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      'Tu proposes "${widget.myBook.titre}" a ${widget.friend.nom}.',
+                                      'Tu proposes "${widget.myBook.titre}" à ${widget.friend.nom}.',
                                       style: AppTextStyles.body,
                                     ),
                                   ],
@@ -187,7 +187,7 @@ class _PickTheirBookPageState extends ConsumerState<PickTheirBookPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            'Livre propose',
+                                            'Livre proposé',
                                             style: AppTextStyles.caption,
                                           ),
                                           const SizedBox(height: 4),

@@ -133,7 +133,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       } else {
         await repo.addToCollection(book.isbn);
         if (mounted) {
-          AppToast.success(context, 'Ajoute a ta collection');
+          AppToast.success(context, 'Ajouté à ta collection');
         }
       }
       ref.invalidate(collectionProvider);
@@ -154,7 +154,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     } else {
       await notifier.add(book);
       if (mounted) {
-        AppToast.success(context, 'Ajoute a la wishlist');
+        AppToast.success(context, 'Ajouté à la wishlist');
       }
     }
   }

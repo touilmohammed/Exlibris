@@ -29,9 +29,9 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   static const List<_NavItemData> _items = [
     _NavItemData(Icons.home_rounded, 'Accueil'),
-    _NavItemData(Icons.bookmarks_rounded, 'Bibliotheque'),
-    _NavItemData(Icons.swap_horiz_rounded, 'Echanges'),
-    _NavItemData(Icons.people_rounded, 'Reseau'),
+    _NavItemData(Icons.bookmarks_rounded, 'Bibliothèque'),
+    _NavItemData(Icons.swap_horiz_rounded, 'Échanges'),
+    _NavItemData(Icons.people_rounded, 'Réseau'),
     _NavItemData(Icons.search_rounded, 'Explorer'),
   ];
 

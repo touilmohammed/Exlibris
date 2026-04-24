@@ -55,7 +55,7 @@ class AccueilPage extends ConsumerWidget {
             ),
             const SizedBox(height: 18),
             _SectionBlock(
-              title: 'Bibliotheque',
+              title: 'Bibliothèque',
               trailing: collectionAsync.asData?.value.isNotEmpty == true
                   ? AppCountBadge(
                       label: '${collectionAsync.asData!.value.length}',
@@ -127,7 +127,7 @@ class _Header extends ConsumerWidget {
           ),
           PopupMenuItem<String>(
             value: 'logout',
-            child: Text('Deconnexion', style: TextStyle(color: Colors.white)),
+            child: Text('Déconnexion', style: TextStyle(color: Colors.white)),
           ),
         ],
         child: const _ProfileMenuTrigger(),
@@ -146,8 +146,8 @@ class _ProfileMenuTrigger extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.08),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        color: Colors.white.withValues(alpha: 0.08),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: const Icon(Icons.person_rounded, color: Colors.white),
     );
@@ -176,11 +176,11 @@ class _PrimaryCard extends StatelessWidget {
 
     final headline = pending.isNotEmpty
         ? 'Tu as ${pending.length} echange${pending.length > 1 ? 's' : ''} a suivre'
-        : 'Ta bibliotheque est prete pour les prochains echanges';
+        : 'Ta bibliothèque est prête pour les prochains échanges';
     final detail = pending.isNotEmpty
         ? (pending.first.livreDemandeurTitre ??
               pending.first.livreDemandeurIsbn)
-        : '$collectionCount livres dans ta collection · $friendsCount dans ton reseau';
+        : '$collectionCount livres dans ta collection · $friendsCount dans ton réseau';
 
     return AppHeroCard(
       child: Column(
@@ -191,7 +191,7 @@ class _PrimaryCard extends StatelessWidget {
               AppCountBadge(
                 label: pending.isNotEmpty
                     ? 'En attente'
-                    : 'Bibliotheque active',
+                    : 'Bibliothèque active',
               ),
               const Spacer(),
               const AppIconBadge(icon: Icons.auto_awesome_rounded),
@@ -215,11 +215,11 @@ class _PrimaryCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _MiniStat(value: '$friendsCount', label: 'Reseau'),
+                child: _MiniStat(value: '$friendsCount', label: 'Réseau'),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _MiniStat(value: '${pending.length}', label: 'Echanges'),
+                child: _MiniStat(value: '${pending.length}', label: 'Échanges'),
               ),
             ],
           ),
@@ -240,7 +240,7 @@ class _MiniStat extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

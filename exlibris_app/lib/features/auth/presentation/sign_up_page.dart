@@ -95,7 +95,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     const _SimpleAuthHeader(
                       title: 'Creer un compte',
                       subtitle:
-                          'Commence a construire ta bibliotheque sociale.',
+                          'Commence à construire ta bibliothèque sociale.',
                       icon: Icons.auto_stories_rounded,
                     ),
                     const SizedBox(height: 18),

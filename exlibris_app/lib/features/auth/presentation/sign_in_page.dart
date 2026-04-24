@@ -119,7 +119,7 @@ class _SignInPageState extends ConsumerState<SignInPage> {
                   children: [
                     const _SimpleAuthHeader(
                       title: 'Connexion',
-                      subtitle: 'Retrouve ta bibliotheque et tes echanges.',
+                      subtitle: 'Retrouve ta bibliothèque et tes échanges.',
                       icon: Icons.menu_book_rounded,
                     ),
                     const SizedBox(height: 18),

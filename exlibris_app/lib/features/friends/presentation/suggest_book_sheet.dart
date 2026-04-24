@@ -79,14 +79,14 @@ class _SuggestBookSheetState extends ConsumerState<SuggestBookSheet> {
 
   Future<void> _submit() async {
     if (_selectedBook == null) {
-      AppToast.warning(context, 'Choisis un livre a suggerer');
+      AppToast.warning(context, 'Choisis un livre à suggérer');
       return;
     }
 
     final selectedBook = _selectedBook!;
     final selectedIsbn = selectedBook.isbn;
     if (selectedIsbn.isEmpty) {
-      AppToast.warning(context, 'Le livre choisi n a pas d ISBN exploitable');
+      AppToast.warning(context, 'Le livre choisi n\'a pas d\'ISBN exploitable');
       return;
     }
 
@@ -103,11 +103,11 @@ class _SuggestBookSheetState extends ConsumerState<SuggestBookSheet> {
     // Le user choisit un titre visible, mais l'envoi utilise bien l'ISBN
     // du livre selectionne pour les futures integrations backend.
     final parts = <String>[
-      'Suggestion envoyee a ${widget.friend.nom}',
+      'Suggestion envoyée à ${widget.friend.nom}',
       selectedBook.titre,
     ];
     if (message.isNotEmpty) {
-      parts.add('Message ajoute');
+      parts.add('Message ajouté');
     }
 
     AppToast.success(context, parts.join(' · '));

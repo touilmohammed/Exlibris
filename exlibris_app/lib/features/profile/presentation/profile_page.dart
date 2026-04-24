@@ -33,24 +33,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   String? _selectedSexe;
   String? _selectedPays;
 
-  final List<String> _sexeOptions = const [
-    'Homme',
-    'Femme',
-    'Non binaire',
-    'Non precise',
-    'Autre',
-  ];
+  final List<String> _sexeOptions = const ['Homme', 'Femme', 'Autre'];
 
   final List<String> _paysOptions = const [
     'France',
     'Belgique',
     'Suisse',
     'Canada',
-    'Algerie',
+    'Algérie',
     'Maroc',
     'Tunisie',
-    'Senegal',
-    'Cote d Ivoire',
+    'Sénégal',
+    'Côte d\'Ivoire',
     'Cameroun',
     'Autre',
   ];
@@ -103,7 +97,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     _selectedSexe = switch (profile.sexe) {
       'male' => 'Homme',
       'femelle' => 'Femme',
-      'indefini' => 'Non precise',
+      'indefini' => 'Autre',
       final value => value,
     };
     _selectedPays = profile.pays;
@@ -150,10 +144,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         return;
       }
       setState(() => _isEditing = false);
-      AppToast.success(context, 'Profil mis a jour');
+      AppToast.success(context, 'Profil mis à jour');
     } catch (_) {
       if (mounted) {
-        AppToast.error(context, 'Erreur lors de la mise a jour');
+        AppToast.error(context, 'Erreur lors de la mise à jour');
       }
     } finally {
       if (mounted) {
@@ -182,7 +176,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         actions: [
           IconButton(
             onPressed: _logout,
-            tooltip: 'Se deconnecter',
+            tooltip: 'Se déconnecter',
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
           ),
         ],
@@ -227,7 +221,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Reessayer'),
+                child: const Text('Réessayer'),
               ),
             ],
           ),
@@ -262,13 +256,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
         const SizedBox(height: 20),
         _ProfileSection(
-          title: 'Confiance et activite',
-          subtitle: 'Ton activite actuelle',
+          title: 'Confiance et activité',
+          subtitle: 'Ton activité actuelle',
           child: Column(
             children: [
               _InfoRow(
                 icon: Icons.swap_horiz_rounded,
-                title: 'Echanges',
+                title: 'Échanges',
                 value: profile.nbLivresCollection > 0
                     ? 'Collection active'
                     : 'Ajoute des livres pour commencer',
@@ -276,17 +270,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               const SizedBox(height: 12),
               _InfoRow(
                 icon: Icons.people_rounded,
-                title: 'Reseau',
+                title: 'Réseau',
                 value: profile.nbAmis > 0
                     ? '${profile.nbAmis} ami${profile.nbAmis > 1 ? 's' : ''} dans ton espace ExLibris.'
-                    : 'Commence a construire ton reseau de lecteurs.',
+                    : 'Commence à construire ton réseau de lecteurs.',
               ),
               const SizedBox(height: 12),
               _InfoRow(
                 icon: Icons.favorite_rounded,
-                title: 'Intentions',
+                title: 'Mes envies',
                 value: profile.nbLivresWishlist > 0
-                    ? '${profile.nbLivresWishlist} envie${profile.nbLivresWishlist > 1 ? 's' : ''} a surveiller.'
+                    ? '${profile.nbLivresWishlist} envie${profile.nbLivresWishlist > 1 ? 's' : ''} à surveiller.'
                     : 'Ta wishlist est vide pour le moment.',
               ),
             ],
@@ -294,13 +288,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         ),
         const SizedBox(height: 20),
         _ProfileSection(
-          title: 'Acces rapides',
+          title: 'Accès rapides',
           subtitle: 'Continuer',
           child: Column(
             children: [
               _QuickLink(
                 icon: Icons.swap_horiz_rounded,
-                label: 'Voir mes echanges',
+                label: 'Voir mes échanges',
                 onTap: () => context.push('/my-exchanges'),
               ),
               const SizedBox(height: 10),
@@ -312,7 +306,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               const SizedBox(height: 10),
               _QuickLink(
                 icon: Icons.library_books_rounded,
-                label: 'Retour a la bibliotheque',
+                label: 'Retour à la bibliothèque',
                 onTap: () => Navigator.of(context).pop(),
               ),
             ],
@@ -360,7 +354,7 @@ class _EditableProfileSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return _ProfileSection(
       title: 'Mes informations',
-      subtitle: isEditing ? 'Modifie puis sauvegarde' : 'Infos de ton compte',
+      subtitle: isEditing ? 'Modifier les informations du profil' : '',
       child: Column(
         children: [
           _FieldRow(
@@ -391,7 +385,7 @@ class _EditableProfileSection extends StatelessWidget {
               readOnly: !isEditing,
               keyboardType: TextInputType.number,
               style: AppTextStyles.bodyWhite,
-              decoration: _inputDecoration(isEditing, 'Non renseigne'),
+              decoration: _inputDecoration(isEditing, 'Non renseigné'),
             ),
           ),
           const SizedBox(height: 12),
@@ -411,12 +405,12 @@ class _EditableProfileSection extends StatelessWidget {
                         )
                         .toList(),
                     onChanged: onSexeChanged,
-                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                    decoration: _inputDecoration(isEditing, 'Non renseigné'),
                   )
                 : Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      selectedSexe ?? 'Non renseigne',
+                      selectedSexe ?? 'Non renseigné',
                       style: AppTextStyles.bodyWhite,
                     ),
                   ),
@@ -438,12 +432,12 @@ class _EditableProfileSection extends StatelessWidget {
                         )
                         .toList(),
                     onChanged: onPaysChanged,
-                    decoration: _inputDecoration(isEditing, 'Non renseigne'),
+                    decoration: _inputDecoration(isEditing, 'Non renseigné'),
                   )
                 : Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      selectedPays ?? 'Non renseigne',
+                      selectedPays ?? 'Non renseigné',
                       style: AppTextStyles.bodyWhite,
                     ),
                   ),
@@ -534,15 +528,9 @@ class _FieldRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: 74,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Text(label, style: AppTextStyles.caption),
-          ),
-        ),
+        SizedBox(width: 72, child: Text(label, style: AppTextStyles.caption)),
         const SizedBox(width: 12),
         Expanded(child: child),
       ],
@@ -566,9 +554,9 @@ class _ProfileHero extends StatelessWidget {
             height: 92,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.08),
+              color: Colors.white.withValues(alpha: 0.08),
               border: Border.all(
-                color: AppColors.accent.withOpacity(0.6),
+                color: AppColors.accent.withValues(alpha: 0.6),
                 width: 2,
               ),
             ),
@@ -586,7 +574,7 @@ class _ProfileHero extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.16),
+              color: AppColors.success.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(999),
             ),
             child: const Text(
@@ -630,7 +618,7 @@ class _StatGrid extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _StatCard(
-            label: 'Reseau',
+            label: 'Réseau',
             value: '${profile.nbAmis}',
             color: AppColors.accent,
           ),
@@ -720,7 +708,7 @@ class _InfoRow extends StatelessWidget {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: AppColors.accent.withOpacity(0.12),
+            color: AppColors.accent.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: AppColors.accent),
@@ -765,7 +753,7 @@ class _QuickLink extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
