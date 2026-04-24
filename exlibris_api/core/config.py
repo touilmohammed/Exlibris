@@ -40,10 +40,17 @@ ALLOWED_ORIGINS: list[str] = [
     origin.strip()
     for origin in _get_env(
         "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:8080"
+        "http://localhost:3000,http://localhost:8080",
     ).split(",")
     if origin.strip()
 ]
+
+ALLOWED_ORIGIN_REGEX: str | None = os.getenv(
+    "ALLOWED_ORIGIN_REGEX",
+    r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$"
+    if APP_ENV == "dev"
+    else None,
+)
 
 SMTP_HOST: str = _get_env("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT: int = int(_get_env("SMTP_PORT", "587"))

@@ -9,7 +9,7 @@ import json
 from scipy.sparse import load_npz
 from sklearn.metrics.pairwise import linear_kernel
 from core.database import get_db_connection
-from core.config import DB_NAME, ALLOWED_ORIGINS
+from core.config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, DB_NAME
 from dependencies.auth import get_current_user_id
 from routers.auth import router as auth_router
 from routers.exchanges import router as exchanges_router
@@ -66,6 +66,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
