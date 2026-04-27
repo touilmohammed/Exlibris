@@ -16,6 +16,8 @@ from routers.exchanges import router as exchanges_router
 from routers.payments import router as payments_router
 from routers.stripe import router as stripe_router
 from routers.messages import router as messages_router
+from routers.ia import router as ia_router
+from services.ia_service import load_models
 from contextlib import asynccontextmanager
 
 ML_PIPELINE = None
@@ -31,27 +33,7 @@ TFIDF_META_PATH = Path(__file__).parent / "ml" / "tfidf_meta.json"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ML_PIPELINE, TFIDF_VECT, TFIDF_MATRIX, TFIDF_META
-
-    try:
-        ML_PIPELINE = joblib.load(ML_PATH)
-        print("[ML] reco_pipeline chargé.")
-    except Exception as e:
-        ML_PIPELINE = None
-        print(f"[ML] Impossible de charger le modèle: {e}")
-
-    try:
-        TFIDF_VECT = joblib.load(TFIDF_VECT_PATH)
-        TFIDF_MATRIX = load_npz(TFIDF_MATRIX_PATH)
-        with open(TFIDF_META_PATH, "r", encoding="utf-8") as f:
-            TFIDF_META = json.load(f)
-        print("[ML] TFIDF modèle livres chargé.")
-    except Exception as e:
-        TFIDF_VECT = None
-        TFIDF_MATRIX = None
-        TFIDF_META = None
-        print(f"[ML] Impossible de charger TFIDF: {e}")
-
+    load_models()
     yield
 
 
@@ -1135,3 +1117,4 @@ app.include_router(exchanges_router)
 app.include_router(payments_router)
 app.include_router(stripe_router)
 app.include_router(messages_router)
+app.include_router(ia_router)
