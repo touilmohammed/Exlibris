@@ -16,8 +16,10 @@ from routers.exchanges import router as exchanges_router
 from routers.payments import router as payments_router
 from routers.stripe import router as stripe_router
 from routers.messages import router as messages_router
+from routers.notifications import router as notifications_router
 from routers.ia import router as ia_router
 from services.ia_service import load_models
+from services.notification_service import create_notification, notify_user
 from contextlib import asynccontextmanager
 
 ML_PIPELINE = None
@@ -990,6 +992,14 @@ def send_friend_request(friend_id: int, current_user_id: int = Depends(get_curre
             VALUES (%s, %s, 'en_attente')
         """, (current_user_id, friend_id))
         conn.commit()
+
+        notification = create_notification(
+            event_type="friend_request",
+            title="Nouvelle demande d'ami",
+            message="Vous avez recu une demande d'ami.",
+            data={"from_user_id": current_user_id},
+        )
+        notify_user(friend_id, notification)
     except HTTPException:
         raise
     except Exception as e:
@@ -1117,4 +1127,5 @@ app.include_router(exchanges_router)
 app.include_router(payments_router)
 app.include_router(stripe_router)
 app.include_router(messages_router)
+app.include_router(notifications_router)
 app.include_router(ia_router)

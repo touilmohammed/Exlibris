@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from core.config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, FRONTEND_URL
 from core.database import get_db_connection
 from dependencies.auth import get_current_user_id
+from services.notification_service import create_notification, notification_manager
 from services.stripe_service import create_checkout_session
 
 router = APIRouter(tags=["stripe"])
@@ -154,6 +155,18 @@ async def stripe_webhook(request: Request):
 
             payment_id, exchange_id, statut = row
 
+            cur.execute(
+                """
+                SELECT demandeur_id, destinataire_id
+                FROM Echange
+                WHERE id_echange = %s
+                """,
+                (exchange_id,),
+            )
+            exchange_row = cur.fetchone()
+            demandeur_id = exchange_row[0] if exchange_row else None
+            destinataire_id = exchange_row[1] if exchange_row else None
+
             if statut == "en_attente" and payment_status == "paid":
                 cur.execute(
                     """
@@ -179,6 +192,31 @@ async def stripe_webhook(request: Request):
                 )
 
                 conn.commit()
+
+                try:
+                    if demandeur_id is not None:
+                        payeur_notification = create_notification(
+                            event_type="payment_validated",
+                            title="Paiement valide",
+                            message="Votre paiement est valide.",
+                            data={"payment_id": payment_id, "exchange_id": exchange_id},
+                        )
+                        await notification_manager.push(demandeur_id, payeur_notification)
+
+                    if destinataire_id is not None and destinataire_id != demandeur_id:
+                        dest_notification = create_notification(
+                            event_type="payment_received",
+                            title="Paiement recu",
+                            message="Un paiement a ete valide pour votre echange.",
+                            data={
+                                "payment_id": payment_id,
+                                "exchange_id": exchange_id,
+                                "from_user_id": demandeur_id or 0,
+                            },
+                        )
+                        await notification_manager.push(destinataire_id, dest_notification)
+                except Exception:
+                    pass
 
         except Exception as e:
             conn.rollback()

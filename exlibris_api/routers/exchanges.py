@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from core.database import get_db_connection
 from dependencies.auth import get_current_user_id
 from schemas.exchange import ExchangeCreate, ExchangeOut, row_to_exchange
+from services.notification_service import create_notification, notify_user
 
 
 router = APIRouter(tags=["exchanges"])
@@ -123,6 +124,19 @@ def create_exchange(
 
         row = _get_exchange_for_update(cur, exchange_id)
         conn.commit()
+
+        notification = create_notification(
+            event_type="exchange_proposal",
+            title="Nouvelle proposition d'echange",
+            message="Vous avez recu une proposition d'echange.",
+            data={
+                "exchange_id": exchange_id,
+                "from_user_id": current_user_id,
+                "livre_demandeur_isbn": body.livre_demandeur_isbn,
+                "livre_destinataire_isbn": body.livre_destinataire_isbn,
+            },
+        )
+        notify_user(body.destinataire_id, notification)
 
     except HTTPException:
         conn.rollback()

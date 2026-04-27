@@ -10,6 +10,7 @@ from schemas.payment import (
     ExchangePaymentOut,
     row_to_exchange_payment,
 )
+from services.notification_service import create_notification, notify_user
 
 
 router = APIRouter(tags=["payments"])
@@ -260,6 +261,10 @@ def sandbox_pay_payment(
                 detail="Ce paiement n'est pas en attente.",
             )
 
+        exchange = _get_exchange_for_update(cur, echange_id)
+        demandeur_id = exchange[1]
+        destinataire_id = exchange[2]
+
         cur.execute(
             """
             UPDATE PaiementEchange
@@ -300,6 +305,27 @@ def sandbox_pay_payment(
         updated_row = cur.fetchone()
 
         conn.commit()
+
+        payeur_notification = create_notification(
+            event_type="payment_validated",
+            title="Paiement valide",
+            message="Votre paiement est valide.",
+            data={"payment_id": payment_id, "exchange_id": echange_id},
+        )
+        notify_user(payeur_id, payeur_notification)
+
+        if destinataire_id != payeur_id:
+            dest_notification = create_notification(
+                event_type="payment_received",
+                title="Paiement recu",
+                message="Un paiement a ete valide pour votre echange.",
+                data={
+                    "payment_id": payment_id,
+                    "exchange_id": echange_id,
+                    "from_user_id": demandeur_id,
+                },
+            )
+            notify_user(destinataire_id, dest_notification)
 
     except HTTPException:
         conn.rollback()

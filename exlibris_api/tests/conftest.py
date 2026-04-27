@@ -32,6 +32,13 @@ def cleanup_test_user():
             row = cur.fetchone()
             if row:
                 user_id = row[0]
+                cur.execute(
+                    """
+                    DELETE FROM Amitie
+                    WHERE utilisateur_1_id = %s OR utilisateur_2_id = %s
+                    """,
+                    (user_id, user_id),
+                )
                 cur.execute("DELETE FROM Utilisateur WHERE id_utilisateur = %s", (user_id,))
                 conn.commit()
         finally:

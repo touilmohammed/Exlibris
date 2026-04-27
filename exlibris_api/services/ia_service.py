@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 import json
 import subprocess
 import sys
@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import linear_kernel
 from fastapi import HTTPException
 
 from core.database import get_db_connection
+from services.notification_service import create_notification, notify_users
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ML_DIR = BASE_DIR / "ml"
@@ -362,7 +363,32 @@ def retrain_models(model: str = "all"):
     load_models()
     reset_events()
 
+    user_ids = _get_all_user_ids()
+    if user_ids:
+        def _factory(_: int):
+            return create_notification(
+                event_type="recommendations_ready",
+                title="Nouvelles recommandations",
+                message="De nouvelles recommandations sont disponibles.",
+                data={"model": model},
+            )
+
+        notify_users(user_ids, _factory)
+
     print(f"[IA] Réentraînement terminé: {model}")
+
+
+def _get_all_user_ids() -> list[int]:
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id_utilisateur FROM Utilisateur")
+        rows = cur.fetchall()
+        return [int(row[0]) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 def _default_events():
