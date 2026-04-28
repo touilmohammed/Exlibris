@@ -125,13 +125,18 @@ def create_exchange(
         row = _get_exchange_for_update(cur, exchange_id)
         conn.commit()
 
+        # Récupérer le nom du demandeur
+        cur.execute("SELECT nom_utilisateur FROM Utilisateur WHERE id_utilisateur = %s", (current_user_id,))
+        sender_name = cur.fetchone()[0]
+
         notification = create_notification(
-            event_type="exchange_proposal",
+            event_type="exchange_request",
             title="Nouvelle proposition d'echange",
-            message="Vous avez recu une proposition d'echange.",
+            message=f"{sender_name} vous a envoye une proposition d'echange.",
             data={
                 "exchange_id": exchange_id,
-                "from_user_id": current_user_id,
+                "friend_id": current_user_id,
+                "friend_name": sender_name,
                 "livre_demandeur_isbn": body.livre_demandeur_isbn,
                 "livre_destinataire_isbn": body.livre_destinataire_isbn,
             },

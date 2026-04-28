@@ -9,6 +9,8 @@ import '../../exchanges/presentation/exchanges_page.dart';
 import '../../friends/presentation/friends_page.dart';
 import '../../library/presentation/library_page.dart';
 
+final homeIndexProvider = StateProvider<int>((ref) => 0);
+
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -17,7 +19,6 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  int _currentIndex = 0;
 
   static const List<Widget> _pages = [
     AccueilPage(),
@@ -61,8 +62,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 );
               },
               child: KeyedSubtree(
-                key: ValueKey(_currentIndex),
-                child: _pages[_currentIndex],
+                key: ValueKey(ref.watch(homeIndexProvider)),
+                child: _pages[ref.watch(homeIndexProvider)],
               ),
             ),
           ),
@@ -105,9 +106,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                           return Stack(
                             children: [
                               AnimatedPositioned(
-                                duration: const Duration(milliseconds: 320),
-                                curve: Curves.easeOutCubic,
-                                left: (_currentIndex * itemWidth) + 8,
+                                  duration: const Duration(milliseconds: 320),
+                                  curve: Curves.easeOutCubic,
+                                  left: (ref.watch(homeIndexProvider) * itemWidth) + 8,
                                 top: 8,
                                 width: itemWidth - 16,
                                 height: 60,
@@ -150,14 +151,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   final item = _items[index];
                                   return _GlassNavItem(
                                     index: index,
-                                    currentIndex: _currentIndex,
+                                    currentIndex: ref.watch(homeIndexProvider),
                                     icon: item.icon,
                                     label: item.label,
                                     onTap: (value) {
-                                      if (value == _currentIndex) {
+                                      if (value == ref.read(homeIndexProvider)) {
                                         return;
                                       }
-                                      setState(() => _currentIndex = value);
+                                      ref.read(homeIndexProvider.notifier).state = value;
                                     },
                                   );
                                 }),

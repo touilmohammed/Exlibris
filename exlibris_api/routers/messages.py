@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from core.database import get_db_connection
 from dependencies.auth import get_current_user_id
+from services.notification_service import create_notification, notify_user
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
 
@@ -80,6 +81,10 @@ def send_message(friend_id: int, message: MessageIn, current_user_id: int = Depe
              conn.close()
              raise HTTPException(status_code=403, detail="Vous n'êtes pas amis avec cet utilisateur")
 
+        # Récupérer le nom de l'expéditeur pour la notification
+        cur.execute("SELECT nom_utilisateur FROM Utilisateur WHERE id_utilisateur = %s", (current_user_id,))
+        sender_name = cur.fetchone()[0]
+
         sql_insert = """
             INSERT INTO Message (expediteur_id, destinataire_id, contenu)
             VALUES (%s, %s, %s)
@@ -91,6 +96,18 @@ def send_message(friend_id: int, message: MessageIn, current_user_id: int = Depe
         new_id = cur.lastrowid
         cur.execute("SELECT id_message, expediteur_id, destinataire_id, contenu, date_envoi FROM Message WHERE id_message = %s", (new_id,))
         row = cur.fetchone()
+
+        # Envoyer la notification
+        notification = create_notification(
+            event_type="new_message",
+            title=f"Nouveau message de {sender_name}",
+            message=message.contenu.strip()[:50] + "..." if len(message.contenu.strip()) > 50 else message.contenu.strip(),
+            data={
+                "friend_id": current_user_id,
+                "friend_name": sender_name
+            }
+        )
+        notify_user(friend_id, notification)
         
     except HTTPException:
         raise

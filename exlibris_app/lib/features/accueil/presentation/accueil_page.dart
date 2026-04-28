@@ -13,6 +13,7 @@ import '../../books/data/books_providers.dart';
 import '../../books/data/books_repository.dart';
 import '../../exchanges/data/exchanges_providers.dart';
 import '../../friends/data/friends_providers.dart';
+import '../../notifications/presentation/notification_bell.dart';
 import '../../profile/data/profile_repository.dart';
 import '../../profile/domain/user_profile.dart';
 
@@ -107,30 +108,37 @@ class _Header extends ConsumerWidget {
     return AppPageHeader(
       title: 'Bonjour, $username',
       subtitle: 'Ton espace du moment',
-      trailing: PopupMenuButton<String>(
-        onSelected: (value) async {
-          if (value == 'logout') {
-            await ref.read(authRepositoryProvider).signOut();
-            if (context.mounted) {
-              AppRouter.goSignIn(context);
-            }
-          } else if (value == 'profile') {
-            context.push('/profile');
-          }
-        },
-        color: const Color(0xFF1A3A3A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        itemBuilder: (context) => const [
-          PopupMenuItem<String>(
-            value: 'profile',
-            child: Text('Mon profil', style: TextStyle(color: Colors.white)),
-          ),
-          PopupMenuItem<String>(
-            value: 'logout',
-            child: Text('Déconnexion', style: TextStyle(color: Colors.white)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const NotificationBell(),
+          const SizedBox(width: 12),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await ref.read(authRepositoryProvider).signOut();
+                if (context.mounted) {
+                  AppRouter.goSignIn(context);
+                }
+              } else if (value == 'profile') {
+                context.push('/profile');
+              }
+            },
+            color: const Color(0xFF1A3A3A),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'profile',
+                child: Text('Mon profil', style: TextStyle(color: Colors.white)),
+              ),
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Text('Déconnexion', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+            child: const _ProfileMenuTrigger(),
           ),
         ],
-        child: const _ProfileMenuTrigger(),
       ),
     );
   }

@@ -26,6 +26,8 @@ dependencies:
   http: ^1.6.0
   confetti: ^0.8.0
   openpgp: ^3.10.7
+  web_socket_channel: ^3.0.3
+  equatable: ^2.0.8
 
 dev_dependencies:
   flutter_test:

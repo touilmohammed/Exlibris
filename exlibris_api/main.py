@@ -715,6 +715,49 @@ def add_wishlist(item: AddItem, current_user_id: int = Depends(get_current_user_
             (current_user_id, item.isbn),
         )
         conn.commit()
+
+        # --- NOTIFICATION LOGIC ---
+        try:
+            # Récupérer les infos nécessaires (nom user, titre livre)
+            cur.execute("SELECT nom_utilisateur FROM Utilisateur WHERE id_utilisateur = %s", (current_user_id,))
+            u_row = cur.fetchone()
+            username = u_row[0] if u_row else "Un ami"
+
+            cur.execute("SELECT titre FROM Livre WHERE isbn = %s", (item.isbn,))
+            l_row = cur.fetchone()
+            book_title = l_row[0] if l_row else "un livre"
+
+            # Trouver les amis qui ont ce livre en collection
+            sql_friends_match = """
+                SELECT u.id_utilisateur
+                FROM Amitie a
+                JOIN Utilisateur u ON (
+                    (a.utilisateur_1_id = %s AND a.utilisateur_2_id = u.id_utilisateur)
+                    OR (a.utilisateur_2_id = %s AND a.utilisateur_1_id = u.id_utilisateur)
+                )
+                JOIN Collection c ON c.utilisateur_id = u.id_utilisateur
+                WHERE a.statut = 'accepte' AND c.livre_isbn = %s
+            """
+            cur.execute(sql_friends_match, (current_user_id, current_user_id, item.isbn))
+            friend_ids = [r[0] for r in cur.fetchall()]
+
+            for f_id in friend_ids:
+                notif = create_notification(
+                    event_type="wishlist_match",
+                    title="Livre recherche par un ami !",
+                    message=f"{username} a ajoute '{book_title}' a sa liste de souhaits. Tu l'as en collection !",
+                    data={
+                        "friend_id": current_user_id,
+                        "friend_name": username,
+                        "isbn": item.isbn,
+                        "book_title": book_title
+                    }
+                )
+                notify_user(f_id, notif)
+        except Exception as e:
+            # On ne bloque pas l'ajout au souhait si la notification échoue
+            print(f"Erreur notification wishlist match: {e}")
+
     except Exception as e:
         conn.rollback()
         conn.close()
