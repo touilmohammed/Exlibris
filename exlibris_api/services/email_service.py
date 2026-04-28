@@ -12,6 +12,10 @@ from core.config import (
 )
 
 
+class MailDeliveryError(Exception):
+    """Raised when the SMTP provider rejects or cannot deliver an email."""
+
+
 def send_confirmation_email(to_email: str, username: str, code: str) -> None:
     """
     Envoie un email de confirmation avec un code à 6 chiffres.
@@ -44,11 +48,14 @@ ExLibris
 """
     )
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        if SMTP_USE_TLS:
-            server.starttls()
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+            if SMTP_USE_TLS:
+                server.starttls()
 
-        if SMTP_USERNAME:
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            if SMTP_USERNAME:
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
 
-        server.send_message(msg)
+            server.send_message(msg)
+    except Exception as exc:
+        raise MailDeliveryError(f"Erreur SMTP: {exc}") from exc

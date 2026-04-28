@@ -11,7 +11,7 @@ from core.security import (
     create_email_verification_code,
 )
 from core.config import EMAIL_CONFIRMATION_EXPIRE_MINUTES
-from services.email_service import send_confirmation_email
+from services.email_service import MailDeliveryError, send_confirmation_email
 from schemas.auth import SignUpBody, LoginBody, ConfirmBody, ResendConfirmationBody, PublishPgpBody
 from dependencies.auth import get_current_user_id
 
@@ -89,6 +89,8 @@ def signup(body: SignUpBody):
     except HTTPException:
         conn.rollback()
         raise
+    except MailDeliveryError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
@@ -271,6 +273,8 @@ def resend_confirmation(body: ResendConfirmationBody):
     except HTTPException:
         conn.rollback()
         raise
+    except MailDeliveryError as e:
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
