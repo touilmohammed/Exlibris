@@ -18,7 +18,7 @@ from routers.stripe import router as stripe_router
 from routers.messages import router as messages_router
 from routers.notifications import router as notifications_router
 from routers.ia import router as ia_router
-from services.ia_service import load_models
+from services.ia_service import load_models, recommend_for_user
 from services.notification_service import create_notification, notify_user
 from contextlib import asynccontextmanager
 
@@ -132,81 +132,7 @@ class RecommendationOut(BaseModel):
 
 @app.get("/me/recommendations", response_model=List[RecommendationOut])
 def me_recommendations(limit: int = 10, current_user_id: int = Depends(get_current_user_id)):
-    if ML_PIPELINE is None:
-        raise HTTPException(status_code=503, detail="Modèle IA non disponible")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        # Profil user (tu as age + pays seulement -> OK)
-        cur.execute("""
-            SELECT COALESCE(age, 0), COALESCE(pays, 'UNK')
-            FROM Utilisateur
-            WHERE id_utilisateur = %s
-        """, (current_user_id,))
-        u = cur.fetchone()
-        if not u:
-            conn.close()
-            raise HTTPException(status_code=404, detail="Utilisateur introuvable")
-
-        age, pays = int(u[0]), str(u[1] or "UNK")
-
-        # Livres déjà possédés
-        cur.execute("""
-            SELECT livre_isbn FROM Collection WHERE utilisateur_id = %s
-        """, (current_user_id,))
-        owned = {r[0] for r in cur.fetchall()}
-
-        # Candidats: derniers livres (tu peux changer la stratégie)
-        cur.execute("""
-            SELECT
-                l.isbn, l.titre, COALESCE(l.auteur, ''),
-                COALESCE(l.langue, 'UNK'),
-                COALESCE(c.nomcat, 'UNK') AS categorie,
-                COALESCE(YEAR(l.date_publication), 0) AS annee_publication,
-                COALESCE(l.resume, '') AS resume
-            FROM Livre l
-            LEFT JOIN Categorie c ON c.id = l.categorie_id
-            ORDER BY l.date_publication DESC
-            LIMIT 500
-        """)
-        books = cur.fetchall()
-
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=f"Erreur MariaDB: {e}")
-
-    conn.close()
-
-    # Filtrer déjà en collection
-    candidates = [b for b in books if b[0] not in owned]
-    if not candidates:
-        return []
-
-    # Construire DataFrame batch pour le pipeline
-    X = pd.DataFrame([{
-        "age": age,
-        "pays": pays,
-        "langue": b[3],
-        "categorie": b[4],
-        "annee_publication": int(b[5] or 0),
-        "resume": b[6],
-    } for b in candidates])
-
-    proba = ML_PIPELINE.predict_proba(X)[:, 1]
-
-    scored = []
-    for i, b in enumerate(candidates):
-        scored.append((b[0], b[1], b[2], float(proba[i])))
-
-    scored.sort(key=lambda x: x[3], reverse=True)
-    top = scored[:max(1, limit)]
-
-    return [
-        RecommendationOut(isbn=s[0], titre=s[1], auteur=s[2], score=round(s[3], 4))
-        for s in top
-    ]
+    return recommend_for_user(current_user_id, limit)
 
 @app.get("/reco/similar", response_model=List[SimilarBookOut])
 def reco_similar(isbn: str, limit: int = 6):

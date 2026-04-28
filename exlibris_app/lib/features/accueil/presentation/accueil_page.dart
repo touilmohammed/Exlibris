@@ -18,11 +18,7 @@ import '../../profile/data/profile_repository.dart';
 import '../../profile/domain/user_profile.dart';
 
 final homeRecommendationsProvider = FutureProvider<List<Book>>((ref) async {
-  try {
-    return await ref.read(booksRepositoryProvider).getRecommendations();
-  } catch (_) {
-    return [];
-  }
+  return ref.read(booksRepositoryProvider).getRecommendations();
 });
 
 final homeProfileProvider = FutureProvider<UserProfile>((ref) async {
@@ -125,15 +121,23 @@ class _Header extends ConsumerWidget {
               }
             },
             color: const Color(0xFF1A3A3A),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             itemBuilder: (context) => const [
               PopupMenuItem<String>(
                 value: 'profile',
-                child: Text('Mon profil', style: TextStyle(color: Colors.white)),
+                child: Text(
+                  'Mon profil',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
               PopupMenuItem<String>(
                 value: 'logout',
-                child: Text('Déconnexion', style: TextStyle(color: Colors.white)),
+                child: Text(
+                  'Déconnexion',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
             child: const _ProfileMenuTrigger(),

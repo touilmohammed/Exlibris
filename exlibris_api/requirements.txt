@@ -47,7 +47,7 @@ watchfiles==1.1.1
 websockets==15.0.1
 pymysql
 python-dotenv
-pandas
-numpy
+pandas==2.2.3
+numpy==1.26.4
 scikit-learn==1.8.0
 joblib
