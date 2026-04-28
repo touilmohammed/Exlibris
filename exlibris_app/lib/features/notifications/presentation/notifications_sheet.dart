@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/app_theme.dart';
-import '../../../models/friend.dart';
 import '../data/notifications_providers.dart';
 import '../../home/presentation/home_page.dart';
 
@@ -45,7 +43,9 @@ class NotificationsSheet extends ConsumerWidget {
                 if (notificationsAsync.valueOrNull?.isNotEmpty == true)
                   TextButton(
                     onPressed: () {
-                      final ids = notificationsAsync.value!.map((n) => n.id).toList();
+                      final ids = notificationsAsync.value!
+                          .map((n) => n.id)
+                          .toList();
                       notifier.markAllAsRead(ids);
                     },
                     style: TextButton.styleFrom(
@@ -84,7 +84,8 @@ class NotificationsSheet extends ConsumerWidget {
                         notifier.markAsRead(notification.id);
                         Navigator.pop(context); // Close the sheet
 
-                        if (notification.type == 'new_message' || notification.type == 'wishlist_match') {
+                        if (notification.type == 'new_message' ||
+                            notification.type == 'wishlist_match') {
                           // On redirige vers l'onglet Réseau (index 3)
                           ref.read(homeIndexProvider.notifier).state = 3;
                         } else if (notification.type == 'exchange_request') {
@@ -100,7 +101,10 @@ class NotificationsSheet extends ConsumerWidget {
                 child: CircularProgressIndicator(color: AppColors.success),
               ),
               error: (err, stack) => Center(
-                child: Text('Erreur: $err', style: const TextStyle(color: AppColors.error)),
+                child: Text(
+                  'Erreur: $err',
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ),
             ),
           ),
@@ -149,14 +153,14 @@ class _NotificationTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead 
-            ? Colors.white.withValues(alpha: 0.03) 
-            : Colors.white.withValues(alpha: 0.08),
+          color: isRead
+              ? Colors.white.withValues(alpha: 0.03)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isRead 
-              ? Colors.transparent 
-              : iconColor.withValues(alpha: 0.3),
+            color: isRead
+                ? Colors.transparent
+                : iconColor.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -181,15 +185,17 @@ class _NotificationTile extends StatelessWidget {
                       fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    notification.message,
-                    style: AppTextStyles.caption.copyWith(
-                      color: isRead 
-                        ? Colors.white.withValues(alpha: 0.5) 
-                        : Colors.white.withValues(alpha: 0.8),
+                  if (notification.type != 'new_message') ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.message,
+                      style: AppTextStyles.caption.copyWith(
+                        color: isRead
+                            ? Colors.white.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.8),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
