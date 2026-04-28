@@ -38,9 +38,15 @@ class NotificationsSheet extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: _NotificationsHeader(
-              canMarkAll: notificationsAsync.valueOrNull?.isNotEmpty == true,
+              canMarkAll:
+                  notificationsAsync.valueOrNull
+                      ?.any((notification) => !readIds.contains(notification.id)) ==
+                  true,
               onMarkAll: () {
-                final ids = notificationsAsync.value!.map((n) => n.id).toList();
+                final ids = notificationsAsync.value!
+                    .where((notification) => !readIds.contains(notification.id))
+                    .map((notification) => notification.id)
+                    .toList();
                 notifier.markAllAsRead(ids);
               },
             ),
@@ -49,10 +55,14 @@ class NotificationsSheet extends ConsumerWidget {
           Expanded(
             child: notificationsAsync.when(
               data: (notifications) {
-                if (notifications.isEmpty) {
+                final unreadNotifications = notifications
+                    .where((notification) => !readIds.contains(notification.id))
+                    .toList();
+
+                if (unreadNotifications.isEmpty) {
                   return const Center(
                     child: Text(
-                      'Aucune notification',
+                      'Aucune nouvelle notification',
                       style: AppTextStyles.bodyWhite,
                     ),
                   );
@@ -60,10 +70,10 @@ class NotificationsSheet extends ConsumerWidget {
 
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  itemCount: notifications.length,
+                  itemCount: unreadNotifications.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    final notification = notifications[index];
+                    final notification = unreadNotifications[index];
                     final isRead = readIds.contains(notification.id);
 
                     return _NotificationTile(
