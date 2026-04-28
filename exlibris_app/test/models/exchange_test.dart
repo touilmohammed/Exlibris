@@ -5,15 +5,15 @@ void main() {
   group('Exchange Model Tests', () {
     test('fromJson() should correctly parse JSON into an Exchange object', () {
       final json = {
-        'id_demande': 1,
-        'expediteur_id': 2,
+        'id_echange': 1,
+        'demandeur_id': 2,
         'destinataire_id': 3,
         'livre_demandeur_isbn': '123',
         'livre_demandeur_titre': 'Book A',
         'livre_destinataire_isbn': '456',
         'livre_destinataire_titre': 'Book B',
         'statut': 'En attente',
-        'date_echange': '2026-04-01T10:00:00Z',
+        'date_creation': '2026-04-01T10:00:00Z',
       };
 
       final exchange = Exchange.fromJson(json);
@@ -31,15 +31,15 @@ void main() {
 
     test('fromJson() should handle nullable fields', () {
       final json = {
-        'id_demande': 10,
-        'expediteur_id': 20,
+        'id_echange': 10,
+        'demandeur_id': 20,
         'destinataire_id': null,
         'livre_demandeur_isbn': '111',
         'livre_demandeur_titre': null,
         'livre_destinataire_isbn': '222',
         'livre_destinataire_titre': null,
         'statut': 'Validé',
-        'date_echange': '2026-03-01T12:00:00Z',
+        'date_creation': '2026-03-01T12:00:00Z',
       };
 
       final exchange = Exchange.fromJson(json);

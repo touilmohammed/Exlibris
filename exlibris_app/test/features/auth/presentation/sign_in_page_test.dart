@@ -26,10 +26,22 @@ class FakeAuthRepository implements AuthRepository {
   Future<void> signUp({required String email, required String username, required String password}) async {}
 
   @override
-  Future<void> confirmEmail({required String token}) async {}
+  Future<void> confirmEmail({
+    required String email,
+    required String code,
+  }) async {}
+
+  @override
+  Future<void> resendConfirmation({required String email}) async {}
 
   @override
   Future<void> signOut() async {}
+
+  @override
+  Future<void> publishPgpKeys({
+    required String publicKey,
+    required String privateKeyEnc,
+  }) async {}
 }
 
 void main() {
@@ -80,7 +92,7 @@ void main() {
       await tester.pumpWidget(createTestWidget());
       
       expect(find.text('Connexion'), findsOneWidget);
-      expect(find.text('Retrouve ta bibliotheque et tes echanges.'), findsOneWidget);
+      expect(find.text('Retrouve ta bibliothèque et tes échanges.'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(2)); // Email et mot de passe
       expect(find.text('Se connecter'), findsOneWidget);
     });

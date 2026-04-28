@@ -93,7 +93,7 @@ void main() {
       await tester.pumpWidget(createTestEnv(tester, repo));
       await tester.pumpAndSettle();
 
-      expect(find.text('Echanges'), findsOneWidget);
+      expect(find.text('Échanges'), findsOneWidget);
       expect(find.text('Tes propositions et leur statut'), findsOneWidget);
 
       // Total 'En attente': 1 in overview + 1 in filter + 2 in the cards

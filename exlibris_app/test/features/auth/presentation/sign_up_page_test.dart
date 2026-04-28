@@ -42,15 +42,15 @@ void main() {
     testWidgets('renders sign up form properly', (tester) async {
       await tester.pumpWidget(createTestEnv());
       
-      expect(find.text('Creer un compte'), findsOneWidget);
+      expect(find.text('Créer un compte'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(4)); // Username, email, pwd, confirm pwd
-      expect(find.text('Creer mon compte'), findsOneWidget);
+      expect(find.text('Créer mon compte'), findsOneWidget);
     });
 
     testWidgets('shows validation errors when fields are empty', (tester) async {
       await tester.pumpWidget(createTestEnv());
       
-      await tester.tap(find.text('Creer mon compte'));
+      await tester.tap(find.text('Créer mon compte'));
       await tester.pump();
 
       expect(find.text('Veuillez entrer votre nom'), findsOneWidget);
@@ -70,14 +70,14 @@ void main() {
       await tester.enterText(inputs.at(2), 'password123');
       await tester.enterText(inputs.at(3), 'notmatching');
 
-      await tester.tap(find.text('Creer mon compte'));
+      await tester.tap(find.text('Créer mon compte'));
       await tester.pump();
 
       expect(find.text('Les mots de passe ne correspondent pas'), findsOneWidget);
       expect(fakeAuthRepository.signUpCalled, isFalse);
     });
 
-    testWidgets('calls signUp and navigates on success', (tester) async {
+    testWidgets('calls signUp and navigates on success after email confirmation', (tester) async {
       await tester.pumpWidget(createTestEnv());
 
       final inputs = find.byType(TextFormField);
@@ -86,14 +86,21 @@ void main() {
       await tester.enterText(inputs.at(2), 'password123');
       await tester.enterText(inputs.at(3), 'password123');
       
-      await tester.tap(find.text('Creer mon compte'));
-      await tester.pumpAndSettle();
+      await tester.tap(find.text('Créer mon compte'));
+      await tester.pumpAndSettle(); // Wait for signup to call dialog
 
       expect(fakeAuthRepository.signUpCalled, isTrue);
-      expect(fakeAuthRepository.usedUsername, 'johndoe');
-      expect(fakeAuthRepository.usedEmail, 'john@test.com');
+      
+      // Verify dialog is shown
+      expect(find.text('Vérifie tes mails'), findsOneWidget);
+      
+      // Enter confirmation code
+      await tester.enterText(find.byType(TextFormField).last, '1234');
+      await tester.tap(find.text('Valider'));
+      await tester.pumpAndSettle();
+
       expect(navigatedToSignIn, isTrue);
-      expect(find.text('Inscription reussie ! Connecte-toi.'), findsWidgets);
+      expect(find.text('Inscription réussie et email confirmé !'), findsWidgets);
     });
     
     testWidgets('shows error toast on conflict (used email)', (tester) async {
@@ -107,13 +114,13 @@ void main() {
       await tester.enterText(inputs.at(2), 'password123');
       await tester.enterText(inputs.at(3), 'password123');
       
-      await tester.tap(find.text('Creer mon compte'));
+      await tester.tap(find.text('Créer mon compte'));
       await tester.pumpAndSettle();
 
       expect(fakeAuthRepository.signUpCalled, isTrue);
       expect(navigatedToSignIn, isFalse);
       
-      expect(find.text('Cet email est deja utilise'), findsOneWidget);
+      expect(find.text('Cet email est déjà utilisé'), findsOneWidget);
     });
   });
 }

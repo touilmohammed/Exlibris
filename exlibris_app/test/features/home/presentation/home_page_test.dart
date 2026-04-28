@@ -62,19 +62,19 @@ void main() {
 
       // Check for navigation labels
       expect(find.text('Accueil'), findsWidgets);
-      expect(find.text('Bibliotheque'), findsWidgets);
-      expect(find.text('Echanges'), findsWidgets);
-      expect(find.text('Reseau'), findsWidgets);
+      expect(find.text('Bibliothèque'), findsWidgets);
+      expect(find.text('Échanges'), findsWidgets);
+      expect(find.text('Réseau'), findsWidgets);
       expect(find.text('Explorer'), findsWidgets);
     });
 
-    testWidgets('bottom navigation switches correctly to Bibliotheque', (tester) async {
+    testWidgets('bottom navigation switches correctly to Bibliothèque', (tester) async {
       await tester.pumpWidget(createTestEnv(tester));
       await tester.pumpAndSettle();
 
-      // Tap on Bibliotheque tab
-      // There might be multiple "Bibliotheque" texts (Tab and Header)
-      final libTab = find.text('Bibliotheque').last;
+      // Tap on Bibliothèque tab
+      // There might be multiple "Bibliothèque" texts (Tab and Header)
+      final libTab = find.text('Bibliothèque').last;
       await tester.tap(libTab);
       // Pump multiple times to ensure AnimatedSwitcher and FutureProvider finish
       await tester.pump();
@@ -82,7 +82,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify header and empty state
-      expect(find.text('Bibliotheque'), findsWidgets);
+      expect(find.text('Bibliothèque'), findsWidgets);
       expect(find.text('Ta collection est encore vide.'), findsWidgets);
     });
 

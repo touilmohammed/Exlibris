@@ -50,7 +50,7 @@ void main() {
       await tester.pumpWidget(createTestEnv(tester));
       await tester.pumpAndSettle();
 
-      expect(find.text('Bibliotheque'), findsWidgets);
+      expect(find.text('Bibliothèque'), findsWidgets);
       expect(find.text('Ta collection est encore vide.'), findsWidgets);
     });
 

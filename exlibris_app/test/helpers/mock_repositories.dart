@@ -41,10 +41,22 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> confirmEmail({required String token}) async {}
+  Future<void> confirmEmail({
+    required String email,
+    required String code,
+  }) async {}
+
+  @override
+  Future<void> resendConfirmation({required String email}) async {}
 
   @override
   Future<void> signOut() async {}
+
+  @override
+  Future<void> publishPgpKeys({
+    required String publicKey,
+    required String privateKeyEnc,
+  }) async {}
 }
 
 class FakeBooksRepository implements BooksRepository {

@@ -37,7 +37,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Choisis le livre que tu proposes a Jean'),
+        find.text('Choisis le livre que tu proposes à Jean'),
         findsOneWidget,
       );
       expect(find.text('Test Book'), findsOneWidget);
