@@ -86,4 +86,19 @@ class FriendsRepository {
   Future<void> sendRequest(int friendId) async {
     await _dio.post('/friends/requests/$friendId');
   }
+
+  /// Suggérer un livre à un ami
+  Future<void> suggestBook({
+    required int friendId,
+    required String isbn,
+    required String reason,
+  }) async {
+    await _dio.post(
+      '/friends/$friendId/suggestions',
+      data: {
+        'isbn': isbn,
+        'reason': reason,
+      },
+    );
+  }
 }

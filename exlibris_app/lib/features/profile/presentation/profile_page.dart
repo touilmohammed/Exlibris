@@ -172,6 +172,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: Colors.white,
+        titleTextStyle: AppTextStyles.heading3.copyWith(
+          color: Colors.white,
+        ),
         leading: const BackButton(color: Colors.white),
         actions: [
           IconButton(
@@ -293,21 +297,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           child: Column(
             children: [
               _QuickLink(
-                icon: Icons.swap_horiz_rounded,
-                label: 'Voir mes échanges',
-                onTap: () => context.push('/my-exchanges'),
-              ),
-              const SizedBox(height: 10),
-              _QuickLink(
                 icon: Icons.volunteer_activism_rounded,
                 label: 'Faire un don',
                 onTap: () => context.push('/donate'),
-              ),
-              const SizedBox(height: 10),
-              _QuickLink(
-                icon: Icons.library_books_rounded,
-                label: 'Retour à la bibliothèque',
-                onTap: () => Navigator.of(context).pop(),
               ),
             ],
           ),

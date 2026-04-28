@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../data/notifications_providers.dart';
 import '../../home/presentation/home_page.dart';
@@ -175,10 +176,18 @@ class _NotificationTile extends StatelessWidget {
         icon = Icons.swap_horiz_rounded;
         iconColor = AppColors.warning;
         break;
+      case 'book_suggestion':
+        icon = Icons.menu_book_rounded;
+        iconColor = AppColors.success;
+        break;
       default:
         icon = Icons.notifications_rounded;
         iconColor = AppColors.success;
     }
+
+    final suggestion = notification.type == 'book_suggestion'
+        ? _BookSuggestionData.from(notification.data)
+        : null;
 
     return GestureDetector(
       onTap: onTap,
@@ -217,7 +226,13 @@ class _NotificationTile extends StatelessWidget {
                       fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
                     ),
                   ),
-                  if (notification.type != 'new_message') ...[
+                  if (suggestion != null) ...[
+                    const SizedBox(height: 10),
+                    _BookSuggestionPreview(
+                      suggestion: suggestion,
+                      isRead: isRead,
+                    ),
+                  ] else if (notification.type != 'new_message') ...[
                     const SizedBox(height: 4),
                     Text(
                       notification.message,
@@ -243,6 +258,111 @@ class _NotificationTile extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BookSuggestionData {
+  final String title;
+  final String author;
+  final String? imageUrl;
+  final String reason;
+
+  const _BookSuggestionData({
+    required this.title,
+    required this.author,
+    required this.imageUrl,
+    required this.reason,
+  });
+
+  factory _BookSuggestionData.from(Map<String, dynamic> data) {
+    final friendName = data['friend_name']?.toString().trim() ?? 'Un ami';
+    final reason = data['reason']?.toString().trim();
+
+    return _BookSuggestionData(
+      title: data['book_title']?.toString().trim() ?? 'Livre suggéré',
+      author: data['book_author']?.toString().trim() ?? '',
+      imageUrl: data['book_image']?.toString(),
+      reason: reason == null || reason.isEmpty
+          ? '$friendName pense que ce livre pourrait te plaire.'
+          : reason,
+    );
+  }
+}
+
+class _BookSuggestionPreview extends StatelessWidget {
+  final _BookSuggestionData suggestion;
+  final bool isRead;
+
+  const _BookSuggestionPreview({
+    required this.suggestion,
+    required this.isRead,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = isRead
+        ? Colors.white.withValues(alpha: 0.62)
+        : Colors.white.withValues(alpha: 0.86);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 46,
+              height: 66,
+              child: BookCover(
+                imageUrl: suggestion.imageUrl,
+                iconSize: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  suggestion.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyWhite.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (suggestion.author.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    suggestion.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.caption.copyWith(color: textColor),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Text(
+                  'Pourquoi : ${suggestion.reason}',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: textColor,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -695,6 +695,11 @@ class Friend(BaseModel):
     pgp_public_key: Optional[str] = None
 
 
+class BookSuggestionBody(BaseModel):
+    isbn: str
+    reason: Optional[str] = None
+
+
 @app.get("/friends", response_model=List[Friend])
 def get_friends(current_user_id: int = Depends(get_current_user_id)):
     """Récupère la liste des amis confirmés de l'utilisateur courant."""
@@ -723,6 +728,105 @@ def get_friends(current_user_id: int = Depends(get_current_user_id)):
         raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
     conn.close()
     return [Friend(id=row[0], nom=row[1], unread_messages=row[2], pgp_public_key=row[3]) for row in rows]
+
+
+@app.post("/friends/{friend_id}/suggestions")
+def suggest_book_to_friend(
+    friend_id: int,
+    body: BookSuggestionBody,
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """Suggérer un livre à un ami et lui envoyer une notification."""
+    if friend_id == current_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Vous ne pouvez pas vous suggérer un livre à vous-même",
+        )
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM Amitie
+            WHERE statut = 'accepte'
+              AND (
+                (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+                OR (utilisateur_1_id = %s AND utilisateur_2_id = %s)
+              )
+            """,
+            (current_user_id, friend_id, friend_id, current_user_id),
+        )
+        if not cur.fetchone():
+            raise HTTPException(
+                status_code=403,
+                detail="Cet utilisateur n'est pas votre ami",
+            )
+
+        cur.execute(
+            """
+            SELECT isbn, titre, COALESCE(auteur, ''), image_petite
+            FROM Livre
+            WHERE isbn = %s
+            """,
+            (body.isbn,),
+        )
+        book = cur.fetchone()
+        if not book:
+            raise HTTPException(status_code=404, detail="Livre introuvable")
+
+        cur.execute(
+            """
+            SELECT nom_utilisateur
+            FROM Utilisateur
+            WHERE id_utilisateur = %s
+            """,
+            (current_user_id,),
+        )
+        sender = cur.fetchone()
+        sender_name = sender[0] if sender else "Un ami"
+
+        cur.execute(
+            """
+            INSERT IGNORE INTO Suggestion (
+                expediteur_id,
+                destinataire_id,
+                livre_isbn
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (current_user_id, friend_id, body.isbn),
+        )
+        conn.commit()
+
+        reason = (body.reason or "").strip()
+        notification = create_notification(
+            event_type="book_suggestion",
+            title=f"{sender_name} te suggère un livre",
+            message=reason
+            or f"{sender_name} pense que ce livre pourrait te plaire.",
+            data={
+                "friend_id": current_user_id,
+                "friend_name": sender_name,
+                "isbn": str(book[0]),
+                "book_title": book[1],
+                "book_author": book[2],
+                "book_image": book[3],
+                "reason": reason,
+            },
+        )
+        notify_user(friend_id, notification)
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+    finally:
+        conn.close()
+
+    return {"ok": True}
 
 
 @app.get("/friends/requests", response_model=List[Friend])

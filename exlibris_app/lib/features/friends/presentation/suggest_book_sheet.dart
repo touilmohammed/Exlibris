@@ -8,6 +8,7 @@ import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
 import '../../../models/friend.dart';
 import '../../books/data/books_repository.dart';
+import '../data/friends_repository.dart';
 
 class SuggestBookSheet extends ConsumerStatefulWidget {
   final Friend friend;
@@ -90,27 +91,40 @@ class _SuggestBookSheetState extends ConsumerState<SuggestBookSheet> {
       return;
     }
 
-    setState(() => _sending = true);
-    await Future<void>.delayed(const Duration(milliseconds: 250));
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).pop();
-
     final message = _messageController.text.trim();
-    // Le user choisit un titre visible, mais l'envoi utilise bien l'ISBN
-    // du livre selectionne pour les futures integrations backend.
-    final parts = <String>[
-      'Suggestion envoyée à ${widget.friend.nom}',
-      selectedBook.titre,
-    ];
-    if (message.isNotEmpty) {
-      parts.add('Message ajouté');
-    }
 
-    AppToast.success(context, parts.join(' · '));
+    setState(() => _sending = true);
+    try {
+      await ref.read(friendsRepositoryProvider).suggestBook(
+            friendId: widget.friend.id,
+            isbn: selectedIsbn,
+            reason: message,
+          );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+
+      final parts = <String>[
+        'Suggestion envoyée à ${widget.friend.nom}',
+        selectedBook.titre,
+      ];
+      if (message.isNotEmpty) {
+        parts.add('Message ajouté');
+      }
+
+      AppToast.success(context, parts.join(' · '));
+    } catch (error) {
+      if (mounted) {
+        AppToast.error(context, 'Erreur lors de l\'envoi : $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
   }
 
   @override
@@ -137,7 +151,7 @@ class _SuggestBookSheetState extends ConsumerState<SuggestBookSheet> {
                     width: 46,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
