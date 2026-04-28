@@ -705,6 +705,11 @@ def _suggestion_has_reason_column(cur) -> bool:
     return cur.fetchone() is not None
 
 
+def _book_suggestion_notification_id(suggestion_id: int, created_at) -> str:
+    created_key = created_at.strftime("%Y%m%d%H%M%S")
+    return f"book-suggestion-{suggestion_id}-{created_key}"
+
+
 @app.get("/friends", response_model=List[Friend])
 def get_friends(current_user_id: int = Depends(get_current_user_id)):
     """Récupère la liste des amis confirmés de l'utilisateur courant."""
@@ -828,7 +833,7 @@ def suggest_book_to_friend(
 
         cur.execute(
             """
-            SELECT id_suggestion
+            SELECT id_suggestion, date_suggestion
             FROM Suggestion
             WHERE expediteur_id = %s
               AND destinataire_id = %s
@@ -838,6 +843,7 @@ def suggest_book_to_friend(
         )
         suggestion_row = cur.fetchone()
         suggestion_id = suggestion_row[0] if suggestion_row else None
+        suggestion_created_at = suggestion_row[1] if suggestion_row else None
         conn.commit()
 
         notification = create_notification(
@@ -856,8 +862,11 @@ def suggest_book_to_friend(
                 "reason": reason,
             },
         )
-        if suggestion_id is not None:
-            notification["id"] = f"book-suggestion-{suggestion_id}"
+        if suggestion_id is not None and suggestion_created_at is not None:
+            notification["id"] = _book_suggestion_notification_id(
+                suggestion_id,
+                suggestion_created_at,
+            )
         notify_user(friend_id, notification)
     except HTTPException:
         conn.rollback()

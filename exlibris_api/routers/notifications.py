@@ -33,6 +33,11 @@ def _suggestion_has_reason_column(cur) -> bool:
     return cur.fetchone() is not None
 
 
+def _book_suggestion_notification_id(suggestion_id: int, created_at) -> str:
+    created_key = created_at.strftime("%Y%m%d%H%M%S")
+    return f"book-suggestion-{suggestion_id}-{created_key}"
+
+
 def _list_book_suggestion_notifications(user_id: int, limit: int) -> list[dict]:
     conn = get_db_connection()
     cur = conn.cursor()
@@ -82,7 +87,7 @@ def _list_book_suggestion_notifications(user_id: int, limit: int) -> list[dict]:
         reason = (reason or "").strip()
         notifications.append(
             {
-                "id": f"book-suggestion-{suggestion_id}",
+                "id": _book_suggestion_notification_id(suggestion_id, created_at),
                 "type": "book_suggestion",
                 "title": f"{friend_name} te suggère un livre",
                 "message": reason

@@ -17,6 +17,7 @@ final notificationsRepositoryProvider = Provider<NotificationsRepository>((
 class NotificationsRepository {
   WebSocketChannel? _channel;
   StreamController<List<NotificationModel>>? _notificationsController;
+  Timer? _pollingTimer;
 
   Stream<List<NotificationModel>> connect() async* {
     _notificationsController =
@@ -84,6 +85,11 @@ class NotificationsRepository {
     );
 
     unawaited(loadHttpFallback());
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => unawaited(loadHttpFallback()),
+    );
 
     yield* _notificationsController!.stream;
   }
@@ -126,6 +132,8 @@ class NotificationsRepository {
   }
 
   void disconnect() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
     _channel?.sink.close();
     _channel = null;
     _notificationsController?.close();
