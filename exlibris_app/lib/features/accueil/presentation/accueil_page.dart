@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app_router.dart';
 import '../../../core/app_components.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../models/book.dart';
 import '../../../models/exchange.dart';
@@ -341,17 +341,7 @@ class _BookCard extends StatelessWidget {
                   color: const Color(0xFF173137),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: book.imagePetite != null && book.imagePetite!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: book.imagePetite!,
-                        fit: BoxFit.cover,
-                        httpHeaders: const {
-                          'User-Agent':
-                              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                        },
-                        errorWidget: (_, __, ___) => const _BookPlaceholder(),
-                      )
-                    : const _BookPlaceholder(),
+                child: BookCover(imageUrl: book.imagePetite, iconSize: 28),
               ),
             ),
             const SizedBox(height: 10),
@@ -373,17 +363,6 @@ class _BookCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _BookPlaceholder extends StatelessWidget {
-  const _BookPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(Icons.menu_book_rounded, color: Colors.white24),
     );
   }
 }

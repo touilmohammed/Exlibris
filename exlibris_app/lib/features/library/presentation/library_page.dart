@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_components.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
@@ -379,23 +379,11 @@ class _BookCard extends StatelessWidget {
                   color: AppColors.gradientEnd,
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: book.imagePetite != null && book.imagePetite!.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: book.imagePetite!,
-                        fit: BoxFit.cover,
-                        httpHeaders: const {
-                          'User-Agent':
-                              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                        },
-                        errorWidget: (_, __, ___) => const _BookPlaceholder(),
-                        placeholder: (_, __) => const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.success,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      )
-                    : const _BookPlaceholder(),
+                child: BookCover(
+                  imageUrl: book.imagePetite,
+                  iconSize: 28,
+                  showLoader: true,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -453,21 +441,6 @@ class _BookCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _BookPlaceholder extends StatelessWidget {
-  const _BookPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        color: Colors.white.withValues(alpha: 0.35),
-        size: 38,
       ),
     );
   }

@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../books/data/books_providers.dart';
 import '../../books/data/books_repository.dart';
 import '../../../models/book.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 
@@ -104,7 +104,10 @@ class _CollectionList extends ConsumerWidget {
                     await repo.removeFromCollection(book.isbn);
                     ref.invalidate(collectionProvider);
                     if (context.mounted) {
-                      AppToast.success(context, 'Retiré de la collection : ${book.titre}');
+                      AppToast.success(
+                        context,
+                        'Retiré de la collection : ${book.titre}',
+                      );
                     }
                   },
                 );
@@ -121,10 +124,7 @@ class _BookGridItem extends StatelessWidget {
   final Book book;
   final VoidCallback onRemove;
 
-  const _BookGridItem({
-    required this.book,
-    required this.onRemove,
-  });
+  const _BookGridItem({required this.book, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +147,10 @@ class _BookGridItem extends StatelessWidget {
                 Text(book.auteur, style: AppTextStyles.body),
                 const SizedBox(height: 16),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.error,
+                  ),
                   title: const Text(
                     'Retirer de ma collection',
                     style: TextStyle(color: Colors.white),
@@ -178,46 +181,13 @@ class _BookGridItem extends StatelessWidget {
                 ),
               ],
             ),
-            child: book.imagePetite != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: CachedNetworkImage(
-                      imageUrl: book.imagePetite!,
-                      httpHeaders: {
-                        'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                      },
-                      fit: BoxFit.contain,
-                      placeholder: (context, url) => const SizedBox(
-                        height: 180,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.success,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => SizedBox(
-                        height: 180,
-                        child: Center(
-                          child: Icon(
-                            Icons.menu_book,
-                            size: 32,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : SizedBox(
-                    height: 180,
-                    child: Center(
-                      child: Icon(
-                        Icons.menu_book,
-                        size: 32,
-                        color: Colors.white.withOpacity(0.5),
-                      ),
-                    ),
-                  ),
+            clipBehavior: Clip.antiAlias,
+            child: BookCover(
+              imageUrl: book.imagePetite,
+              fit: BoxFit.contain,
+              iconSize: 32,
+              showLoader: true,
+            ),
           ),
           const SizedBox(height: 8),
           // Title

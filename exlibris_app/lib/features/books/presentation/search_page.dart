@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/app_components.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
@@ -472,13 +472,7 @@ class _SearchResultCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               clipBehavior: Clip.antiAlias,
-              child: book.imagePetite != null && book.imagePetite!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: book.imagePetite!,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => const _SearchCoverFallback(),
-                    )
-                  : const _SearchCoverFallback(),
+              child: BookCover(imageUrl: book.imagePetite, iconSize: 34),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -609,21 +603,6 @@ class _ActionPill extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _SearchCoverFallback extends StatelessWidget {
-  const _SearchCoverFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        size: 34,
-        color: Colors.white.withOpacity(0.3),
       ),
     );
   }

@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_components.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
@@ -44,6 +44,8 @@ class BookDetailsPage extends ConsumerWidget {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: AppColors.textPrimary,
+        titleTextStyle: AppTextStyles.heading3,
         leading: const BackButton(color: Colors.white),
       ),
       body: Container(
@@ -151,17 +153,7 @@ class _Hero extends StatelessWidget {
               ],
             ),
             clipBehavior: Clip.antiAlias,
-            child: book.imagePetite != null && book.imagePetite!.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: book.imagePetite!,
-                    fit: BoxFit.cover,
-                    httpHeaders: const {
-                      'User-Agent':
-                          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-                    },
-                    errorWidget: (_, __, ___) => const _CoverFallback(),
-                  )
-                : const _CoverFallback(),
+            child: BookCover(imageUrl: book.imagePetite, iconSize: 38),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -170,7 +162,10 @@ class _Hero extends StatelessWidget {
               children: [
                 Text(
                   book.titre,
-                  style: AppTextStyles.heading2.copyWith(height: 1.15),
+                  style: AppTextStyles.heading2.copyWith(
+                    color: AppColors.textPrimary,
+                    height: 1.15,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -391,21 +386,6 @@ class _SectionCard extends StatelessWidget {
           const SizedBox(height: 14),
           child,
         ],
-      ),
-    );
-  }
-}
-
-class _CoverFallback extends StatelessWidget {
-  const _CoverFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        color: Colors.white.withOpacity(0.28),
-        size: 38,
       ),
     );
   }

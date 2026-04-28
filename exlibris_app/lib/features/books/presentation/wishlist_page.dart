@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../data/books_providers.dart';
 import '../../../models/book.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 
@@ -93,25 +94,9 @@ class _WishlistTile extends ConsumerWidget {
           decoration: BoxDecoration(
             color: AppColors.gradientEnd,
             borderRadius: BorderRadius.circular(8),
-            image: book.imagePetite != null
-                ? DecorationImage(
-                    image: NetworkImage(book.imagePetite!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
           ),
-          child: book.imagePetite == null
-              ? Center(
-                  child: Text(
-                    book.titre.isNotEmpty ? book.titre[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                )
-              : null,
+          clipBehavior: Clip.antiAlias,
+          child: BookCover(imageUrl: book.imagePetite, iconSize: 24),
         ),
         title: Text(
           book.titre,

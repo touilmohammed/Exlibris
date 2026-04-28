@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/app_components.dart';
+import '../../../core/book_cover.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/app_toast.dart';
 import '../../../models/book.dart';
@@ -388,24 +388,7 @@ class _BookThumb extends StatelessWidget {
         color: AppColors.gradientEnd,
       ),
       clipBehavior: Clip.antiAlias,
-      child: book.imagePetite != null && book.imagePetite!.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: book.imagePetite!,
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => const _BookThumbFallback(),
-            )
-          : const _BookThumbFallback(),
-    );
-  }
-}
-
-class _BookThumbFallback extends StatelessWidget {
-  const _BookThumbFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Icon(Icons.menu_book_rounded, color: Colors.white24, size: 24),
+      child: BookCover(imageUrl: book.imagePetite, iconSize: 24),
     );
   }
 }

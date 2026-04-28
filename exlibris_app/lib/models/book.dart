@@ -24,12 +24,50 @@ class Book {
       isbn: json['isbn']?.toString() ?? '',
       titre: json['titre']?.toString() ?? '',
       auteur: json['auteur']?.toString() ?? '',
-      categorie: json['categorie']?.toString(),
+      categorie: _cleanCategory(json['categorie']),
       imagePetite: json['image_petite']?.toString(),
       resume: json['resume']?.toString(),
       editeur: json['editeur']?.toString(),
       langue: json['langue']?.toString(),
     );
+  }
+
+  static String? _cleanCategory(Object? value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is List) {
+      final items = value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+      return items.isEmpty ? null : items.join(', ');
+    }
+
+    var category = value.toString().trim();
+    if (category.isEmpty) {
+      return null;
+    }
+
+    if (category.startsWith('[') && category.endsWith(']')) {
+      category = category.substring(1, category.length - 1);
+    }
+
+    final items = category
+        .split(',')
+        .map(
+          (item) =>
+              item.trim().replaceAll(RegExp(r'''^['"]|['"]$'''), '').trim(),
+        )
+        .where((item) => item.isNotEmpty)
+        .toList();
+
+    if (items.isEmpty) {
+      return null;
+    }
+
+    return items.join(', ');
   }
 
   Map<String, dynamic> toJson() {

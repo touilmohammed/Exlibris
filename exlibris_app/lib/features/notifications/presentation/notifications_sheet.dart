@@ -36,24 +36,12 @@ class NotificationsSheet extends ConsumerWidget {
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Notifications', style: AppTextStyles.heading2),
-                if (notificationsAsync.valueOrNull?.isNotEmpty == true)
-                  TextButton(
-                    onPressed: () {
-                      final ids = notificationsAsync.value!
-                          .map((n) => n.id)
-                          .toList();
-                      notifier.markAllAsRead(ids);
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.accent,
-                    ),
-                    child: const Text('Tout marquer comme lu'),
-                  ),
-              ],
+            child: _NotificationsHeader(
+              canMarkAll: notificationsAsync.valueOrNull?.isNotEmpty == true,
+              onMarkAll: () {
+                final ids = notificationsAsync.value!.map((n) => n.id).toList();
+                notifier.markAllAsRead(ids);
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -110,6 +98,50 @@ class NotificationsSheet extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _NotificationsHeader extends StatelessWidget {
+  final bool canMarkAll;
+  final VoidCallback onMarkAll;
+
+  const _NotificationsHeader({
+    required this.canMarkAll,
+    required this.onMarkAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 360;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
+          children: [
+            const Text('Notifications', style: AppTextStyles.heading2),
+            if (canMarkAll)
+              TextButton(
+                onPressed: onMarkAll,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  isCompact ? 'Tout lu' : 'Tout marquer comme lu',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
