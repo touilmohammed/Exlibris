@@ -81,7 +81,24 @@ class BooksRepository {
           .toList();
     }
     throw Exception(
-        'Format de réponse /me/recommendations invalide : ${res.data}');
+      'Format de réponse /me/recommendations invalide : ${res.data}',
+    );
+  }
+
+  /// Récupérer les livres similaires à un ISBN
+  Future<List<Book>> getSimilarBooks(String isbn, {int limit = 8}) async {
+    final res = await _dio.get(
+      '/reco/similar',
+      queryParameters: {'isbn': isbn, 'limit': limit},
+    );
+    if (res.data is List) {
+      final data = res.data as List;
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map((m) => Book.fromJson(m))
+          .toList();
+    }
+    throw Exception('Format de réponse /reco/similar invalide : ${res.data}');
   }
 
   /// Ajouter un livre à la collection

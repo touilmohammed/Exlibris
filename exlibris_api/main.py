@@ -2,12 +2,6 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import joblib
-from pathlib import Path
-import pandas as pd
-import json
-from scipy.sparse import load_npz
-from sklearn.metrics.pairwise import linear_kernel
 from core.database import get_db_connection
 from core.config import ALLOWED_ORIGIN_REGEX, ALLOWED_ORIGINS, DB_NAME
 from dependencies.auth import get_current_user_id
@@ -18,20 +12,9 @@ from routers.stripe import router as stripe_router
 from routers.messages import router as messages_router
 from routers.notifications import router as notifications_router
 from routers.ia import router as ia_router
-from services.ia_service import load_models, recommend_for_user
+from services.ia_service import load_models, recommend_for_user, similar_books
 from services.notification_service import create_notification, notify_user
 from contextlib import asynccontextmanager
-
-ML_PIPELINE = None
-ML_PATH = Path(__file__).parent / "ml" / "reco_pipeline.pkl"
-
-TFIDF_VECT = None
-TFIDF_MATRIX = None
-TFIDF_META = None
-
-TFIDF_VECT_PATH = Path(__file__).parent / "ml" / "tfidf_vectorizer.pkl"
-TFIDF_MATRIX_PATH = Path(__file__).parent / "ml" / "tfidf_matrix.npz"
-TFIDF_META_PATH = Path(__file__).parent / "ml" / "tfidf_meta.json"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -141,39 +124,7 @@ def me_recommendations(limit: int = 10, current_user_id: int = Depends(get_curre
 
 @app.get("/reco/similar", response_model=List[SimilarBookOut])
 def reco_similar(isbn: str, limit: int = 6):
-    if TFIDF_MATRIX is None or TFIDF_META is None:
-        raise HTTPException(status_code=503, detail="Modèle TF-IDF non disponible")
-
-    # retrouver l'index du livre dans meta
-    idx = None
-    for i, item in enumerate(TFIDF_META):
-        if str(item.get("isbn")) == str(isbn):
-            idx = i
-            break
-
-    if idx is None:
-        raise HTTPException(status_code=404, detail="ISBN introuvable dans l'index TF-IDF")
-
-    sims = linear_kernel(TFIDF_MATRIX[idx], TFIDF_MATRIX).flatten()
-    order = sims.argsort()[::-1]
-
-    results = []
-    for j in order:
-        if j == idx:
-            continue
-        it = TFIDF_META[int(j)]
-        results.append(SimilarBookOut(
-            isbn=it.get("isbn", ""),
-            titre=it.get("titre", ""),
-            auteur=it.get("auteur", ""),
-            editeur=it.get("editeur", None),
-            image=it.get("image", None),
-            similarity=float(sims[int(j)]),
-        ))
-        if len(results) >= max(1, limit):
-            break
-
-    return results
+    return similar_books(isbn, limit)
 
 
 # --------------------------------------------------------------------

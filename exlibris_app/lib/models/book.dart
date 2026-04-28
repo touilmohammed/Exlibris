@@ -25,7 +25,8 @@ class Book {
       titre: json['titre']?.toString() ?? '',
       auteur: json['auteur']?.toString() ?? '',
       categorie: _cleanCategory(json['categorie']),
-      imagePetite: json['image_petite']?.toString(),
+      imagePetite:
+          json['image_petite']?.toString() ?? json['image']?.toString(),
       resume: json['resume']?.toString(),
       editeur: json['editeur']?.toString(),
       langue: json['langue']?.toString(),

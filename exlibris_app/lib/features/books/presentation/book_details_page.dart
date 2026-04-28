@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/app_components.dart';
 import '../../../core/book_cover.dart';
@@ -12,6 +13,11 @@ import '../../ratings/data/ratings_repository.dart';
 import '../data/books_providers.dart';
 import '../data/books_repository.dart';
 
+final similarBooksProvider = FutureProvider.autoDispose
+    .family<List<Book>, String>((ref, isbn) async {
+      return ref.read(booksRepositoryProvider).getSimilarBooks(isbn);
+    });
+
 class BookDetailsPage extends ConsumerWidget {
   final Book book;
 
@@ -23,6 +29,7 @@ class BookDetailsPage extends ConsumerWidget {
         ref.watch(collectionProvider).asData?.value ?? const <Book>[];
     final wishlist = ref.watch(wishlistProvider);
     final ratingsAsync = ref.watch(myRatingsProvider);
+    final similarBooksAsync = ref.watch(similarBooksProvider(book.isbn));
 
     final inCollection = collection.any((item) => item.isbn == book.isbn);
     final inWishlist = wishlist.any((item) => item.isbn == book.isbn);
@@ -118,8 +125,112 @@ class BookDetailsPage extends ConsumerWidget {
                   style: AppTextStyles.body.copyWith(height: 1.5),
                 ),
               ),
+              const SizedBox(height: 18),
+              _SimilarBooksSection(similarBooksAsync: similarBooksAsync),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SimilarBooksSection extends StatelessWidget {
+  final AsyncValue<List<Book>> similarBooksAsync;
+
+  const _SimilarBooksSection({required this.similarBooksAsync});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: 'Livres similaires',
+      child: similarBooksAsync.when(
+        data: (books) {
+          if (books.isEmpty) {
+            return Text(
+              'Aucune suggestion similaire pour le moment.',
+              style: AppTextStyles.body,
+            );
+          }
+
+          return SizedBox(
+            height: 218,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: books.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                return _SimilarBookCard(book: books[index]);
+              },
+            ),
+          );
+        },
+        loading: () => const SizedBox(
+          height: 96,
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppColors.success,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+        error: (_, __) => Text(
+          'Impossible de charger les livres similaires.',
+          style: AppTextStyles.body,
+        ),
+      ),
+    );
+  }
+}
+
+class _SimilarBookCard extends StatelessWidget {
+  final Book book;
+
+  const _SimilarBookCard({required this.book});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/book', extra: book),
+      child: SizedBox(
+        width: 112,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 112,
+              height: 156,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.gradientEnd,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: BookCover(imageUrl: book.imagePetite, iconSize: 28),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 34,
+              child: Text(
+                book.titre,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodyWhite.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              book.auteur.isEmpty ? 'Auteur inconnu' : book.auteur,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption,
+            ),
+          ],
         ),
       ),
     );
