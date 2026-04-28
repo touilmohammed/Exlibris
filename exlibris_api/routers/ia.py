@@ -20,6 +20,11 @@ class RecommendationOut(BaseModel):
     isbn: str
     titre: str
     auteur: str
+    categorie: Optional[str] = None
+    image_petite: Optional[str] = None
+    resume: Optional[str] = None
+    editeur: Optional[str] = None
+    langue: Optional[str] = None
     score: float
 
 

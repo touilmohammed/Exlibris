@@ -206,7 +206,9 @@ def recommend_for_user(user_id: int, limit: int = 10):
                 COALESCE(l.resume, ''),
                 COALESCE(pop.nb_evaluations, 0),
                 COALESCE(cat_col.user_category_collection_count, 0),
-                COALESCE(cat_wish.user_category_wishlist_count, 0)
+                COALESCE(cat_wish.user_category_wishlist_count, 0),
+                l.image_petite,
+                l.editeur
             FROM Livre l
             LEFT JOIN Categorie c ON c.id = l.categorie_id
             LEFT JOIN (
@@ -288,6 +290,11 @@ def recommend_for_user(user_id: int, limit: int = 10):
             "isbn": b[0],
             "titre": b[1],
             "auteur": b[2],
+            "langue": b[3],
+            "categorie": b[4],
+            "resume": b[6],
+            "image_petite": b[10],
+            "editeur": b[11],
             "score": round(final_score, 4),
         })
 
