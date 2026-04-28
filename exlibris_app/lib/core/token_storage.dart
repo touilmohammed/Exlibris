@@ -1,7 +1,14 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TokenStorage {
-  static const _key = 'auth_token';
+  static String _suffix = '';
+
+  /// Définit un suffixe pour les clés de stockage (utile pour l'isolation de session)
+  static void setSessionSuffix(String suffix) {
+    _suffix = suffix;
+  }
+
+  static String get _key => 'auth_token$_suffix';
 
   static Future<void> save(String token) async {
     final prefs = await SharedPreferences.getInstance();

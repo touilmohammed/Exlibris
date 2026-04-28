@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:openpgp/openpgp.dart';
 
 class PgpService {
+  final String _suffix;
   final _storage = const FlutterSecureStorage();
-  static const String _privateKeyKey = 'pgp_private_key';
-  static const String _publicKeyKey = 'pgp_public_key';
-  
+
+  PgpService({String suffix = ''}) : _suffix = suffix;
+
+  String get _privateKeyKey => 'pgp_private_key$_suffix';
+  String get _publicKeyKey => 'pgp_public_key$_suffix';
+
   // 1. Generate local keys
   Future<KeyPair> generateKeyPair(String name, String email) async {
     var keyOptions = KeyOptions()..rsaBits = 2048;
