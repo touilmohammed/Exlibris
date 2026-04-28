@@ -83,6 +83,8 @@ class NotificationsRepository {
       },
     );
 
+    unawaited(loadHttpFallback());
+
     yield* _notificationsController!.stream;
   }
 

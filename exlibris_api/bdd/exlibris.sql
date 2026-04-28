@@ -214,6 +214,7 @@ CREATE TABLE Suggestion (
   expediteur_id    INT NOT NULL,
   destinataire_id  INT NOT NULL,
   livre_isbn       VARCHAR(13) NOT NULL,
+  raison           TEXT NULL,
   date_suggestion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   acceptee         TINYINT(1) NOT NULL DEFAULT 0,
 

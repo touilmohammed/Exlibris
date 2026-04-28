@@ -700,6 +700,11 @@ class BookSuggestionBody(BaseModel):
     reason: Optional[str] = None
 
 
+def _suggestion_has_reason_column(cur) -> bool:
+    cur.execute("SHOW COLUMNS FROM Suggestion LIKE 'raison'")
+    return cur.fetchone() is not None
+
+
 @app.get("/friends", response_model=List[Friend])
 def get_friends(current_user_id: int = Depends(get_current_user_id)):
     """Récupère la liste des amis confirmés de l'utilisateur courant."""
@@ -786,21 +791,55 @@ def suggest_book_to_friend(
         )
         sender = cur.fetchone()
         sender_name = sender[0] if sender else "Un ami"
+        reason = (body.reason or "").strip()
+
+        if _suggestion_has_reason_column(cur):
+            cur.execute(
+                """
+                INSERT INTO Suggestion (
+                    expediteur_id,
+                    destinataire_id,
+                    livre_isbn,
+                    raison
+                )
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    date_suggestion = CURRENT_TIMESTAMP,
+                    acceptee = 0,
+                    raison = VALUES(raison)
+                """,
+                (current_user_id, friend_id, body.isbn, reason),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO Suggestion (
+                    expediteur_id,
+                    destinataire_id,
+                    livre_isbn
+                )
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    date_suggestion = CURRENT_TIMESTAMP,
+                    acceptee = 0
+                """,
+                (current_user_id, friend_id, body.isbn),
+            )
 
         cur.execute(
             """
-            INSERT IGNORE INTO Suggestion (
-                expediteur_id,
-                destinataire_id,
-                livre_isbn
-            )
-            VALUES (%s, %s, %s)
+            SELECT id_suggestion
+            FROM Suggestion
+            WHERE expediteur_id = %s
+              AND destinataire_id = %s
+              AND livre_isbn = %s
             """,
             (current_user_id, friend_id, body.isbn),
         )
+        suggestion_row = cur.fetchone()
+        suggestion_id = suggestion_row[0] if suggestion_row else None
         conn.commit()
 
-        reason = (body.reason or "").strip()
         notification = create_notification(
             event_type="book_suggestion",
             title=f"{sender_name} te suggère un livre",
@@ -809,6 +848,7 @@ def suggest_book_to_friend(
             data={
                 "friend_id": current_user_id,
                 "friend_name": sender_name,
+                "suggestion_id": suggestion_id,
                 "isbn": str(book[0]),
                 "book_title": book[1],
                 "book_author": book[2],
@@ -816,6 +856,8 @@ def suggest_book_to_friend(
                 "reason": reason,
             },
         )
+        if suggestion_id is not None:
+            notification["id"] = f"book-suggestion-{suggestion_id}"
         notify_user(friend_id, notification)
     except HTTPException:
         conn.rollback()
