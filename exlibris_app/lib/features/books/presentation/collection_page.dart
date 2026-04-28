@@ -91,7 +91,7 @@ class _CollectionList extends ConsumerWidget {
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.45,
+                childAspectRatio: 0.5,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 16,
               ),
@@ -169,24 +169,26 @@ class _BookGridItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Cover
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.gradientEnd,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: BookCover(
-              imageUrl: book.imagePetite,
-              fit: BoxFit.contain,
-              iconSize: 32,
-              showLoader: true,
+          AspectRatio(
+            aspectRatio: 2 / 3,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.gradientEnd,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: BookCover(
+                imageUrl: book.imagePetite,
+                iconSize: 28,
+                showLoader: true,
+              ),
             ),
           ),
           const SizedBox(height: 8),

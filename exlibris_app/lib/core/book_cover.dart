@@ -17,7 +17,7 @@ class BookCover extends StatelessWidget {
   const BookCover({
     super.key,
     required this.imageUrl,
-    this.fit = BoxFit.cover,
+    this.fit = BoxFit.contain,
     this.iconSize = 32,
     this.showLoader = false,
   });
@@ -25,25 +25,33 @@ class BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = imageUrl?.trim();
-    if (url == null || url.isEmpty) {
-      return _BookCoverFallback(iconSize: iconSize);
-    }
-
-    return CachedNetworkImage(
-      imageUrl: url,
-      fit: fit,
-      width: double.infinity,
-      height: double.infinity,
-      httpHeaders: bookCoverHttpHeaders,
-      placeholder: showLoader
-          ? (_, __) => const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.success,
-                strokeWidth: 2,
-              ),
-            )
-          : null,
-      errorWidget: (_, __, ___) => _BookCoverFallback(iconSize: iconSize),
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF18373D), Color(0xFF0B252B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: url == null || url.isEmpty
+          ? _BookCoverFallback(iconSize: iconSize)
+          : CachedNetworkImage(
+              imageUrl: url,
+              fit: fit,
+              width: double.infinity,
+              height: double.infinity,
+              httpHeaders: bookCoverHttpHeaders,
+              placeholder: showLoader
+                  ? (_, __) => const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.success,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : null,
+              errorWidget: (_, __, ___) =>
+                  _BookCoverFallback(iconSize: iconSize),
+            ),
     );
   }
 }
@@ -56,10 +64,19 @@ class _BookCoverFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Icon(
-        Icons.menu_book_rounded,
-        color: Colors.white24,
-        size: iconSize,
+      child: Container(
+        width: iconSize * 1.7,
+        height: iconSize * 2.3,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(iconSize * 0.22),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Icon(
+          Icons.auto_stories_rounded,
+          color: AppColors.accent.withValues(alpha: 0.72),
+          size: iconSize,
+        ),
       ),
     );
   }

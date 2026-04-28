@@ -335,7 +335,7 @@ class _BooksSliver extends StatelessWidget {
     return SliverGrid(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
+        mainAxisExtent: 304,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -372,7 +372,9 @@ class _BookCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              height: 170,
+              width: double.infinity,
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
@@ -381,63 +383,73 @@ class _BookCard extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 child: BookCover(
                   imageUrl: book.imagePetite,
-                  iconSize: 28,
+                  iconSize: 30,
                   showLoader: true,
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              book.titre,
-              style: AppTextStyles.bodyWhite.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+            SizedBox(
+              height: 34,
+              child: Text(
+                book.titre,
+                style: AppTextStyles.bodyWhite.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 3),
-            Text(
-              book.auteur.isEmpty ? 'Auteur inconnu' : book.auteur,
-              style: AppTextStyles.caption,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            SizedBox(
+              height: 15,
+              child: Text(
+                book.auteur.isEmpty ? 'Auteur inconnu' : book.auteur,
+                style: AppTextStyles.caption.copyWith(height: 1.2),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (book.categorie != null && book.categorie!.isNotEmpty)
-                  Expanded(
-                    child: Text(
-                      book.categorie!,
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.white60,
-                        fontSize: 11,
+            SizedBox(
+              height: 34,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (book.categorie != null && book.categorie!.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        book.categorie!,
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white60,
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    )
+                  else
+                    const Spacer(),
+                  TextButton(
+                    onPressed: onAction,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.success,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  )
-                else
-                  const Spacer(),
-                TextButton(
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.success,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
+                    child: Text(
+                      actionLabel,
+                      style: const TextStyle(fontSize: 12),
                     ),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Text(
-                    actionLabel,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

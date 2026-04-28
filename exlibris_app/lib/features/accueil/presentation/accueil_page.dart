@@ -309,7 +309,7 @@ class _BookStrip extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 208,
+      height: 232,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: books.length,
@@ -334,31 +334,40 @@ class _BookCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            SizedBox(
+              height: 164,
+              width: 118,
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   color: const Color(0xFF173137),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: BookCover(imageUrl: book.imagePetite, iconSize: 28),
+                child: BookCover(imageUrl: book.imagePetite, iconSize: 30),
               ),
             ),
             const SizedBox(height: 10),
-            Text(
-              book.titre,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.bodyWhite.copyWith(
-                fontWeight: FontWeight.w600,
+            SizedBox(
+              height: 36,
+              child: Text(
+                book.titre,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodyWhite.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              book.auteur,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption,
+            SizedBox(
+              height: 16,
+              child: Text(
+                book.auteur,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption,
+              ),
             ),
           ],
         ),
